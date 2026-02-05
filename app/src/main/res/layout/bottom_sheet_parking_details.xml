@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bottom_sheet_background"
+    android:paddingBottom="24dp">
+
+    <!-- Drag Handle -->
+    <View
+        android:id="@+id/drag_handle"
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/drag_handle_bg"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Title -->
+    <TextView
+        android:id="@+id/tv_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:fontFamily="@font/jost_semibold"
+        android:text="Details"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/drag_handle" />
+
+    <!-- Parking Image -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_image"
+        android:layout_width="0dp"
+        android:layout_height="160dp"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="20dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="0dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_title">
+
+        <ImageView
+            android:id="@+id/iv_parking_image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@color/nav_background_purple" />
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Parking Name -->
+    <TextView
+        android:id="@+id/tv_parking_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="8dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/jost_semibold"
+        android:maxLines="1"
+        android:text="Parking Lot Name"
+        android:textColor="@color/text_primary"
+        android:textSize="18sp"
+        app:layout_constraintEnd_toStartOf="@id/btn_save"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/card_image" />
+
+    <!-- Save Button -->
+    <ImageView
+        android:id="@+id/btn_save"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_marginEnd="20dp"
+        android:padding="4dp"
+        android:src="@drawable/ic_saved_outline"
+        app:layout_constraintBottom_toBottomOf="@id/tv_parking_name"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@id/tv_parking_name"
+        app:tint="@color/mainpurple" />
+
+    <!-- Address -->
+    <TextView
+        android:id="@+id/tv_parking_address"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="20dp"
+        android:ellipsize="end"
+        android:fontFamily="@font/jost_regular"
+        android:maxLines="2"
+        android:text="Address will appear here"
+        android:textColor="@color/text_secondary"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_parking_name" />
+
+    <!-- Buttons Container -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="20dp"
+        android:layout_marginTop="24dp"
+        android:orientation="horizontal"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tv_parking_address">
+
+        <!-- Cancel Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_cancel"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:fontFamily="@font/jost_medium"
+            android:text="Cancel"
+            android:textAllCaps="false"
+            android:textColor="@color/text_secondary"
+            app:cornerRadius="26dp"
+            app:strokeColor="@color/button_border"
+            app:strokeWidth="1dp" />
+
+        <!-- Details Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_details"
+            android:layout_width="0dp"
+            android:layout_height="52dp"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:backgroundTint="@color/mainpurple"
+            android:fontFamily="@font/jost_medium"
+            android:text="Details"
+            android:textAllCaps="false"
+            android:textColor="@color/white"
+            app:cornerRadius="26dp"
+            app:icon="@drawable/ic_arrow_forward"
+            app:iconGravity="end"
+            app:iconTint="@color/white" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

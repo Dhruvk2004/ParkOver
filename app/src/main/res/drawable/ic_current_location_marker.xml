@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Outer pulse circle -->
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#40613EEA" />
+            <size
+                android:width="48dp"
+                android:height="48dp" />
+        </shape>
+    </item>
+    <!-- Inner circle -->
+    <item
+        android:bottom="12dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:top="12dp">
+        <shape android:shape="oval">
+            <solid android:color="#613EEA" />
+            <stroke
+                android:width="3dp"
+                android:color="#FFFFFF" />
+        </shape>
+    </item>
+</layer-list>

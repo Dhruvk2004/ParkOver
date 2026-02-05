@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "378040040813",
+    "project_id": "parkover-8c764",
+    "storage_bucket": "parkover-8c764.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:378040040813:android:715927f6b04b05b8d2ee64",
+        "android_client_info": {
+          "package_name": "com.example.parkover"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "378040040813-mg2p7r2kvor4hhuup0j1pu86ni5pq8cq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.parkover",
+            "certificate_hash": "3005cb7c54aabd0349906fe4181a157a5146000b"
+          }
+        },
+        {
+          "client_id": "378040040813-01nk1vglbb3n8v6vhgitj6hk3vpfafo9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBd2CW4nY52pEFFHzY0jdnY21O2WN2Nc3E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "378040040813-01nk1vglbb3n8v6vhgitj6hk3vpfafo9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

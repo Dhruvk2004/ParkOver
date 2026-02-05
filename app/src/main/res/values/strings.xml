@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ParkOver</string>
+    
+    <!-- Google Maps API Key -->
+    <string name="google_maps_key">AIzaSyDzNg-gCkJ-KBPxmenxwzjDTFrF8ISeebA</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_saved">Saved</string>
+    <string name="nav_booking">Booking</string>
+    <string name="nav_profile">Profile</string>
+    
+    <!-- Authentication -->
+    <string name="welcome">Welcome!</string>
+    <string name="login">Login</string>
+    <string name="sign_up">Sign Up</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="full_name">Full Name</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="dont_have_account">Don\'t have an account?</string>
+    <string name="already_have_account">Already have an account?</string>
+    <string name="or_continue_with">Or continue with</string>
+    
+    <!-- Home -->
+    <string name="search_location">Search Location</string>
+    <string name="nearby_parking">Nearby Parking</string>
+    <string name="show_details">Show Details</string>
+    <string name="book_parking">Book Parking</string>
+    
+    <!-- Parking Details -->
+    <string name="parking_details">Parking Details</string>
+    <string name="amenities">Amenities</string>
+    <string name="operating_hours">Operating Hours</string>
+    <string name="reviews">Reviews</string>
+    <string name="price_per_hour">per hour</string>
+    <string name="price_per_day">per day</string>
+    <string name="available_spots">Available Spots</string>
+    <string name="distance">Distance</string>
+    
+    <!-- Booking -->
+    <string name="select_vehicle">Select Vehicle</string>
+    <string name="select_floor">Select Floor</string>
+    <string name="booking_confirmation">Booking Confirmation</string>
+    <string name="review_summary">Review Summary</string>
+    <string name="payment">Payment</string>
+    <string name="booking_receipt">Booking Receipt</string>
+    <string name="ongoing">Ongoing</string>
+    <string name="past">Past</string>
+    
+    <!-- Vehicle -->
+    <string name="add_vehicle">Add Vehicle</string>
+    <string name="manage_vehicles">Manage Vehicles</string>
+    <string name="vehicle_number">Vehicle Number</string>
+    <string name="vehicle_model">Vehicle Model</string>
+    <string name="vehicle_brand">Vehicle Brand</string>
+    <string name="vehicle_color">Vehicle Color</string>
+    <string name="two_wheeler">2 Wheeler</string>
+    <string name="four_wheeler">4 Wheeler</string>
+    <string name="heavy_vehicle">Heavy Vehicle</string>
+    
+    <!-- Profile -->
+    <string name="edit_profile">Edit Profile</string>
+    <string name="payment_methods">Payment Methods</string>
+    <string name="booking_history">Booking History</string>
+    <string name="saved_addresses">Saved Addresses</string>
+    <string name="notifications">Notifications</string>
+    <string name="help_support">Help &amp; Support</string>
+    <string name="about">About</string>
+    <string name="logout">Logout</string>
+    
+    <!-- Payment Methods -->
+    <string name="upi">UPI</string>
+    <string name="net_banking">Net Banking</string>
+    <string name="card">Card</string>
+    <string name="pay_at_parking">Pay at Parking</string>
+    
+    <!-- Empty States -->
+    <string name="no_saved_parking">No saved parking spots</string>
+    <string name="no_ongoing_bookings">No ongoing bookings</string>
+    <string name="no_past_bookings">No past bookings</string>
+    <string name="no_vehicles">No vehicles added</string>
+    <string name="no_parking_found">No parking spots found nearby</string>
+    
+    <!-- Actions -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="continue_text">Continue</string>
+    <string name="proceed_to_payment">Proceed to Payment</string>
+    <string name="download_receipt">Download Receipt</string>
+    <string name="get_directions">Get Directions</string>
+    <string name="extend_booking">Extend Booking</string>
+    <string name="cancel_booking">Cancel Booking</string>
+    <string name="rebook">Rebook</string>
+    <string name="rate_review">Rate &amp; Review</string>
+    
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong. Please try again.</string>
+    <string name="error_network">No internet connection</string>
+    <string name="error_location_permission">Location permission required</string>
+    <string name="error_invalid_email">Please enter a valid email</string>
+    <string name="error_invalid_password">Password must be at least 6 characters</string>
+    <string name="error_password_mismatch">Passwords do not match</string>
+    <string name="error_empty_field">This field is required</string>
+    <string name="error_invalid_vehicle_number">Please enter a valid vehicle number</string>
+    
+    <!-- Success -->
+    <string name="success_booking">Booking confirmed!</string>
+    <string name="success_vehicle_added">Vehicle added successfully</string>
+    <string name="success_profile_updated">Profile updated successfully</string>
+    
+    <!-- Misc -->
+    <string name="loading">Loading…</string>
+    <string name="retry">Retry</string>
+    <string name="open_24_hours">Open 24 Hours</string>
+    <string name="closed">Closed</string>
+    <string name="offline_mode">Offline Mode</string>
+</resources>

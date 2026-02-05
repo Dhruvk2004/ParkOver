@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/homeFragment">
+
+    <!-- Main Bottom Navigation Destinations -->
+    <fragment
+        android:id="@+id/homeFragment"
+        android:name="com.example.parkover.ui.fragments.home.HomeFragment"
+        android:label="Home"
+        tools:layout="@layout/fragment_home">
+        
+        <action
+            android:id="@+id/action_home_to_parkingDetails"
+            app:destination="@id/parkingDetailsFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/savedFragment"
+        android:name="com.example.parkover.ui.fragments.saved.SavedFragment"
+        android:label="Saved"
+        tools:layout="@layout/fragment_saved" />
+
+    <fragment
+        android:id="@+id/bookingFragment"
+        android:name="com.example.parkover.ui.fragments.booking.BookingFragment"
+        android:label="Booking"
+        tools:layout="@layout/fragment_booking" />
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.parkover.ui.fragments.profile.ProfileFragment"
+        android:label="Profile"
+        tools:layout="@layout/fragment_profile">
+        
+        <action
+            android:id="@+id/action_profile_to_savedVehicles"
+            app:destination="@id/savedVehiclesFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/savedVehiclesFragment"
+        android:name="com.example.parkover.ui.fragments.profile.SavedVehiclesFragment"
+        android:label="Saved Vehicles"
+        tools:layout="@layout/fragment_saved_vehicles" />
+
+    <!-- Booking Flow Fragments -->
+    <fragment
+        android:id="@+id/parkingDetailsFragment"
+        android:name="com.example.parkover.ui.fragments.booking.ParkingDetailsFragment"
+        android:label="Parking Details"
+        tools:layout="@layout/fragment_parking_details">
+        
+        <action
+            android:id="@+id/action_parkingDetails_to_selectVehicle"
+            app:destination="@id/selectVehicleFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/selectVehicleFragment"
+        android:name="com.example.parkover.ui.fragments.booking.SelectVehicleFragment"
+        android:label="Select Vehicle"
+        tools:layout="@layout/fragment_select_vehicle">
+        
+        <action
+            android:id="@+id/action_selectVehicle_to_selectFloor"
+            app:destination="@id/selectFloorFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/selectFloorFragment"
+        android:name="com.example.parkover.ui.fragments.booking.SelectFloorFragment"
+        android:label="Select Floor"
+        tools:layout="@layout/fragment_select_floor">
+        
+        <action
+            android:id="@+id/action_selectFloor_to_confirmBooking"
+            app:destination="@id/confirmBookingFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/confirmBookingFragment"
+        android:name="com.example.parkover.ui.fragments.booking.ConfirmBookingFragment"
+        android:label="Confirm Booking"
+        tools:layout="@layout/fragment_confirm_booking">
+        
+        <action
+            android:id="@+id/action_confirmBooking_to_reviewSummary"
+            app:destination="@id/reviewSummaryFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/reviewSummaryFragment"
+        android:name="com.example.parkover.ui.fragments.booking.ReviewSummaryFragment"
+        android:label="Review Summary"
+        tools:layout="@layout/fragment_review_summary">
+        
+        <action
+            android:id="@+id/action_reviewSummary_to_payment"
+            app:destination="@id/paymentFragment"
+            app:enterAnim="@anim/slide_in_right"
+            app:exitAnim="@anim/slide_out_left"
+            app:popEnterAnim="@anim/slide_in_left"
+            app:popExitAnim="@anim/slide_out_right" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/paymentFragment"
+        android:name="com.example.parkover.ui.fragments.booking.PaymentFragment"
+        android:label="Payment"
+        tools:layout="@layout/fragment_payment">
+        
+        <action
+            android:id="@+id/action_payment_to_bookingSuccess"
+            app:destination="@id/bookingSuccessFragment"
+            app:enterAnim="@anim/fade_in"
+            app:exitAnim="@anim/fade_out"
+            app:popUpTo="@id/homeFragment"
+            app:popUpToInclusive="false" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/bookingSuccessFragment"
+        android:name="com.example.parkover.ui.fragments.booking.BookingSuccessFragment"
+        android:label="Booking Success"
+        tools:layout="@layout/fragment_booking_success" />
+
+</navigation>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Top gradient -->
+    <item android:top="0dp" android:height="150dp">
+        <shape>
+            <gradient
+                android:startColor="#60000000"
+                android:endColor="#00000000"
+                android:angle="270" />
+        </shape>
+    </item>
+
+    <!-- Bottom gradient -->
+    <item android:top="-150dp" android:bottom="0dp">
+        <shape>
+            <gradient
+                android:startColor="#00000000"
+                android:endColor="#70000000"
+                android:angle="270" />
+        </shape>
+    </item>
+
+    <!-- Left gradient -->
+    <item android:left="0dp" android:width="100dp">
+        <shape>
+            <gradient
+                android:startColor="#60000000"
+                android:endColor="#00000000"
+                android:angle="0" />
+        </shape>
+    </item>
+
+    <!-- Right gradient -->
+    <item android:left="-100dp" android:right="0dp">
+        <shape>
+            <gradient
+                android:startColor="#00000000"
+                android:endColor="#60000000"
+                android:angle="0" />
+        </shape>
+    </item>
+
+</layer-list>

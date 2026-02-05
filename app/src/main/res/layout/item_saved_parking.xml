@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="@color/white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="12dp">
+
+        <!-- Parking Image -->
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/iv_parking_image"
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:background="@color/text_grey"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:shapeAppearanceOverlay="@style/RoundedImageView" />
+
+        <!-- Parking Name -->
+        <TextView
+            android:id="@+id/tv_parking_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/jost_semibold"
+            android:maxLines="1"
+            android:text="Parking Name"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            app:layout_constraintEnd_toStartOf="@id/btn_unsave"
+            app:layout_constraintStart_toEndOf="@id/iv_parking_image"
+            app:layout_constraintTop_toTopOf="@id/iv_parking_image" />
+
+        <!-- Address -->
+        <TextView
+            android:id="@+id/tv_address"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:fontFamily="@font/jost_regular"
+            android:maxLines="1"
+            android:text="123 Street Address"
+            android:textColor="@color/text_grey"
+            android:textSize="13sp"
+            app:layout_constraintEnd_toEndOf="@id/tv_parking_name"
+            app:layout_constraintStart_toStartOf="@id/tv_parking_name"
+            app:layout_constraintTop_toBottomOf="@id/tv_parking_name" />
+
+        <!-- Rating & Distance -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintBottom_toBottomOf="@id/iv_parking_image"
+            app:layout_constraintStart_toStartOf="@id/tv_parking_name"
+            app:layout_constraintTop_toBottomOf="@id/tv_address">
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_star"
+                app:tint="@color/star_filled" />
+
+            <TextView
+                android:id="@+id/tv_rating"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:fontFamily="@font/jost_medium"
+                android:text="4.5"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="4dp"
+                android:layout_height="4dp"
+                android:layout_marginHorizontal="8dp"
+                android:background="@drawable/dot_divider" />
+
+            <TextView
+                android:id="@+id/tv_price"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/jost_semibold"
+                android:text="₹50/hr"
+                android:textColor="@color/mainpurple"
+                android:textSize="13sp" />
+
+            <View
+                android:layout_width="4dp"
+                android:layout_height="4dp"
+                android:layout_marginHorizontal="8dp"
+                android:background="@drawable/dot_divider" />
+
+            <TextView
+                android:id="@+id/tv_spots"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="@font/jost_regular"
+                android:text="25 spots"
+                android:textColor="@color/status_available"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Unsave Button -->
+        <ImageView
+            android:id="@+id/btn_unsave"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:padding="4dp"
+            android:src="@drawable/ic_saved_filled"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:tint="@color/mainpurple" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

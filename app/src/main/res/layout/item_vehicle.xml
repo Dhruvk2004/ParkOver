@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_vehicle"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="12dp"
+    app:cardBackgroundColor="@color/background_white"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="0dp"
+    app:strokeColor="@color/button_border"
+    app:strokeWidth="1dp">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp">
+
+        <!-- Vehicle Image -->
+        <ImageView
+            android:id="@+id/iv_vehicle"
+            android:layout_width="80dp"
+            android:layout_height="60dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/carlogo"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Vehicle Name -->
+        <TextView
+            android:id="@+id/tv_vehicle_name"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="16dp"
+            android:fontFamily="@font/jost_semibold"
+            android:text="Toyota Land Cruiser"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            app:layout_constraintBottom_toTopOf="@id/tv_vehicle_number"
+            app:layout_constraintEnd_toStartOf="@id/radio_button"
+            app:layout_constraintStart_toEndOf="@id/iv_vehicle"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_chainStyle="packed" />
+
+        <!-- Vehicle Number -->
+        <TextView
+            android:id="@+id/tv_vehicle_number"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginEnd="16dp"
+            android:fontFamily="@font/jost_regular"
+            android:text="AFD 6397"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/radio_button"
+            app:layout_constraintStart_toEndOf="@id/iv_vehicle"
+            app:layout_constraintTop_toBottomOf="@id/tv_vehicle_name" />
+
+        <!-- Radio Button -->
+        <RadioButton
+            android:id="@+id/radio_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:buttonTint="@color/mainpurple"
+            android:clickable="false"
+            android:focusable="false"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.material.card.MaterialCardView>

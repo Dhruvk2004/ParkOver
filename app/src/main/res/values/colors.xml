@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    
+    <!-- Primary Colors -->
+    <color name="mainpurple">#613EEA</color>
+    <color name="mainpurple_light">#7B5CF5</color>
+    <color name="mainpurple_dark">#4A2BC7</color>
+    
+    <!-- Background Colors -->
+    <color name="background_white">#F9FAFB</color>
+    <color name="dark_card">#1A1A2E</color>
+    <color name="dark_card_secondary">#2D2D3A</color>
+    <color name="search_bar_bg">#2D2D3A</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">#1F2937</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_white">#FFFFFF</color>
+    <color name="text_grey">#9CA3AF</color>
+    
+    <!-- UI Colors -->
+    <color name="light_grey">#707070</color>
+    <color name="button_border">#E5E7EB</color>
+    <color name="divider">#E5E7EB</color>
+    
+    <!-- Navigation Colors -->
+    <color name="nav_inactive">#4A4A5A</color>
+    <color name="nav_background">#FFFFFF</color>
+    <color name="nav_background_purple">#E8E0FA</color>
+    
+    <!-- Status Colors -->
+    <color name="status_available">#22C55E</color>
+    <color name="status_limited">#F59E0B</color>
+    <color name="status_full">#EF4444</color>
+    <color name="status_closed">#9CA3AF</color>
+    
+    <!-- Map Colors -->
+    <color name="map_marker_pulse">#4D613EEA</color>
+    
+    <!-- Rating -->
+    <color name="star_filled">#FBBF24</color>
+    <color name="star_empty">#E5E7EB</color>
+</resources>

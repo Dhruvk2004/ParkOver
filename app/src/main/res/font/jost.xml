@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Thin 100 -->
+    <font
+        android:font="@font/jost_thin"
+        android:fontWeight="100"
+        android:fontStyle="normal" />
+
+    <!-- Thin Italic 100 -->
+    <font
+        android:font="@font/jost_thinitalic"
+        android:fontWeight="100"
+        android:fontStyle="italic" />
+
+    <!-- Extra Light 200 -->
+    <font
+        android:font="@font/jost_extralight"
+        android:fontWeight="200"
+        android:fontStyle="normal" />
+
+    <!-- Extra Light Italic 200 -->
+    <font
+        android:font="@font/jost_extralightitalic"
+        android:fontWeight="200"
+        android:fontStyle="italic" />
+
+    <!-- Light 300 -->
+    <font
+        android:font="@font/jost_light"
+        android:fontWeight="300"
+        android:fontStyle="normal" />
+
+    <!-- Light Italic 300 -->
+    <font
+        android:font="@font/jost_lightitalic"
+        android:fontWeight="300"
+        android:fontStyle="italic" />
+
+    <!-- Regular 400 -->
+    <font
+        android:font="@font/jost_regular"
+        android:fontWeight="400"
+        android:fontStyle="normal" />
+
+    <!-- Italic 400 -->
+    <font
+        android:font="@font/jost_italic"
+        android:fontWeight="400"
+        android:fontStyle="italic" />
+
+    <!-- Medium 500 -->
+    <font
+        android:font="@font/jost_medium"
+        android:fontWeight="500"
+        android:fontStyle="normal" />
+
+    <!-- Medium Italic 500 -->
+    <font
+        android:font="@font/jost_mediumitalic"
+        android:fontWeight="500"
+        android:fontStyle="italic" />
+
+    <!-- SemiBold 600 -->
+    <font
+        android:font="@font/jost_semibold"
+        android:fontWeight="600"
+        android:fontStyle="normal" />
+
+    <!-- SemiBold Italic 600 -->
+    <font
+        android:font="@font/jost_semibolditalic"
+        android:fontWeight="600"
+        android:fontStyle="italic" />
+
+    <!-- Bold 700 -->
+    <font
+        android:font="@font/jost_bold"
+        android:fontWeight="700"
+        android:fontStyle="normal" />
+
+    <!-- Bold Italic 700 -->
+    <font
+        android:font="@font/jost_bolditalic"
+        android:fontWeight="700"
+        android:fontStyle="italic" />
+
+    <!-- Extra Bold 800 -->
+    <font
+        android:font="@font/jost_extrabold"
+        android:fontWeight="800"
+        android:fontStyle="normal" />
+
+    <!-- Extra Bold Italic 800 -->
+    <font
+        android:font="@font/jost_extrabolditalic"
+        android:fontWeight="800"
+        android:fontStyle="italic" />
+
+    <!-- Black 900 -->
+    <font
+        android:font="@font/jost_black"
+        android:fontWeight="900"
+        android:fontStyle="normal" />
+
+    <!-- Black Italic 900 -->
+    <font
+        android:font="@font/jost_blackitalic"
+        android:fontWeight="900"
+        android:fontStyle="italic" />
+
+</font-family>

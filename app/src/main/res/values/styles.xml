@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <!-- Bottom Navigation Indicator Style - Pill background behind selected item -->
+    <style name="BottomNavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:width">44dp</item>
+        <item name="android:height">44dp</item>
+        <item name="android:color">@color/mainpurple</item>
+        <item name="shapeAppearance">@style/BottomNavIndicatorShape</item>
+    </style>
+    
+    <style name="BottomNavIndicatorShape" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+    
+    <!-- Circle Image View -->
+    <style name="CircleImageView" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+    
+    <!-- Rounded Image View -->
+    <style name="RoundedImageView" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+    
+    <!-- Tab Text Appearance -->
+    <style name="TabTextAppearance" parent="TextAppearance.Design.Tab">
+        <item name="android:textSize">14sp</item>
+        <item name="fontFamily">@font/jost_medium</item>
+        <item name="android:fontFamily">@font/jost_medium</item>
+        <item name="textAllCaps">false</item>
+    </style>
+
+    <!-- Bottom Sheet Dialog Theme -->
+    <style name="BottomSheetDialogTheme" parent="Theme.Design.Light.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/BottomSheetStyle</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
+
+    <style name="BottomSheetStyle" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
+    
+    <!-- Primary Button Style -->
+    <style name="PrimaryButton" parent="Widget.MaterialComponents.Button">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">@font/jost_semibold</item>
+        <item name="backgroundTint">@color/mainpurple</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    
+    <!-- Secondary Button Style -->
+    <style name="SecondaryButton" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">56dp</item>
+        <item name="android:textColor">@color/mainpurple</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">@font/jost_semibold</item>
+        <item name="strokeColor">@color/mainpurple</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+    
+    <!-- Input Field Style -->
+    <style name="InputField" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
+        <item name="boxStrokeColor">@color/button_border</item>
+        <item name="hintTextColor">@color/text_grey</item>
+    </style>
+    
+    <!-- Card Style -->
+    <style name="CardStyle" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">4dp</item>
+        <item name="cardBackgroundColor">@color/white</item>
+    </style>
+    
+    <!-- Dark Card Style (for top header) -->
+    <style name="DarkCardStyle" parent="Widget.MaterialComponents.CardView">
+        <item name="cardCornerRadius">24dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@color/dark_card</item>
+    </style>
+    
+    <!-- Toolbar Title Style -->
+    <style name="ToolbarTitleStyle" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textSize">20sp</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="fontFamily">@font/jost_semibold</item>
+    </style>
+    
+</resources>
