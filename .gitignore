@@ -16,3 +16,6 @@ local.properties
 
 # Kiro settings
 .kiro/
+
+# API folder (separate repo)
+/api/
