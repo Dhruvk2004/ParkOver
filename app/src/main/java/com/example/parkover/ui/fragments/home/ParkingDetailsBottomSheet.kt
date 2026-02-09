@@ -5,18 +5,23 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.navigation.fragment.findNavController
+import coil.load
 import com.example.parkover.R
+import com.example.parkover.data.model.ParkingSpot
 import com.example.parkover.databinding.BottomSheetParkingDetailsBinding
 import com.example.parkover.ui.fragments.booking.ParkingDetailsFragment
 import com.example.parkover.utils.LocationHelper
 import com.example.parkover.utils.showToast
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
 
     private var _binding: BottomSheetParkingDetailsBinding? = null
     private val binding get() = _binding!!
 
+    private var parkingSpot: ParkingSpot? = null
     private var parkingName: String = ""
     private var parkingAddress: String = ""
     private var latitude: Double = 0.0
@@ -27,6 +32,7 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
     private var isSaved: Boolean = false
 
     companion object {
+        private const val ARG_PARKING_SPOT = "parking_spot"
         private const val ARG_NAME = "name"
         private const val ARG_ADDRESS = "address"
         private const val ARG_LAT = "latitude"
@@ -36,6 +42,7 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
         private const val ARG_DISTANCE = "distance"
 
         fun newInstance(
+            parkingSpot: ParkingSpot? = null,
             name: String,
             address: String,
             latitude: Double,
@@ -46,6 +53,7 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
         ): ParkingDetailsBottomSheet {
             return ParkingDetailsBottomSheet().apply {
                 arguments = Bundle().apply {
+                    parkingSpot?.let { putString(ARG_PARKING_SPOT, it.id) }
                     putString(ARG_NAME, name)
                     putString(ARG_ADDRESS, address)
                     putDouble(ARG_LAT, latitude)
@@ -54,6 +62,7 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
                     putDouble(ARG_CURRENT_LNG, currentLng)
                     putString(ARG_DISTANCE, distance)
                 }
+                this.parkingSpot = parkingSpot
             }
         }
     }
@@ -109,15 +118,20 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
             binding.tvParkingAddress.text = parkingAddress
         }
 
-        // TODO: Load actual parking image from Firestore
-        // For now using placeholder
+        // Load parking image from API if available
+        parkingSpot?.images?.firstOrNull()?.let { imageUrl ->
+            binding.ivParkingImage.load(imageUrl) {
+                crossfade(true)
+                placeholder(R.color.nav_background_purple)
+                error(R.color.nav_background_purple)
+            }
+        }
+        
+        // Check if already saved
+        checkIfSaved()
 
         binding.btnSave.setOnClickListener {
-            isSaved = !isSaved
-            updateSaveButton()
-            val message = if (isSaved) "Saved to favorites" else "Removed from favorites"
-            context?.showToast(message)
-            // TODO: Save to Firestore
+            toggleSaved()
         }
 
         binding.btnCancel.setOnClickListener {
@@ -126,24 +140,98 @@ class ParkingDetailsBottomSheet : BottomSheetDialogFragment() {
 
         binding.btnDetails.setOnClickListener {
             dismiss()
-            // Navigate to full parking details fragment
-            val bundle = Bundle().apply {
-                putString(ParkingDetailsFragment.ARG_PARKING_ID, "parking_${System.currentTimeMillis()}")
-                putString(ParkingDetailsFragment.ARG_PARKING_NAME, parkingName)
-                putString(ParkingDetailsFragment.ARG_PARKING_ADDRESS, parkingAddress)
-                putDouble(ParkingDetailsFragment.ARG_PRICE_PER_HOUR, 50.0)
-                putDouble(ParkingDetailsFragment.ARG_LATITUDE, latitude)
-                putDouble(ParkingDetailsFragment.ARG_LONGITUDE, longitude)
-                putInt(ParkingDetailsFragment.ARG_AVAILABLE_SPOTS, 25)
-                putInt(ParkingDetailsFragment.ARG_TOTAL_SPOTS, 100)
-                putFloat(ParkingDetailsFragment.ARG_RATING, 4.5f)
-            }
-            
-            parentFragment?.findNavController()?.navigate(
-                R.id.action_home_to_parkingDetails,
-                bundle
-            )
+            navigateToParkingDetails()
         }
+    }
+    
+    private fun checkIfSaved() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val spotId = parkingSpot?.id ?: return
+        
+        FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("savedParkings")
+            .document(spotId)
+            .get()
+            .addOnSuccessListener { doc ->
+                isSaved = doc.exists()
+                updateSaveButton()
+            }
+    }
+    
+    private fun toggleSaved() {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        val spot = parkingSpot
+        
+        if (userId == null) {
+            context?.showToast("Please login to save")
+            return
+        }
+        
+        isSaved = !isSaved
+        updateSaveButton()
+        
+        val savedRef = FirebaseFirestore.getInstance()
+            .collection("users")
+            .document(userId)
+            .collection("savedParkings")
+        
+        if (isSaved && spot != null) {
+            // Save to Firestore
+            val savedData = mapOf(
+                "parkingId" to spot.id,
+                "name" to spot.name,
+                "address" to spot.address,
+                "latitude" to spot.latitude,
+                "longitude" to spot.longitude,
+                "pricePerHour" to spot.pricePerHourFourWheeler,
+                "rating" to spot.rating,
+                "savedAt" to com.google.firebase.Timestamp.now()
+            )
+            savedRef.document(spot.id).set(savedData)
+                .addOnSuccessListener {
+                    context?.showToast("Saved to favorites")
+                }
+                .addOnFailureListener {
+                    isSaved = false
+                    updateSaveButton()
+                    context?.showToast("Failed to save")
+                }
+        } else if (spot != null) {
+            // Remove from Firestore
+            savedRef.document(spot.id).delete()
+                .addOnSuccessListener {
+                    context?.showToast("Removed from favorites")
+                }
+                .addOnFailureListener {
+                    isSaved = true
+                    updateSaveButton()
+                    context?.showToast("Failed to remove")
+                }
+        }
+    }
+    
+    private fun navigateToParkingDetails() {
+        val spot = parkingSpot
+        val bundle = Bundle().apply {
+            putString(ParkingDetailsFragment.ARG_PARKING_ID, spot?.id ?: "parking_${System.currentTimeMillis()}")
+            putString(ParkingDetailsFragment.ARG_PARKING_NAME, parkingName)
+            putString(ParkingDetailsFragment.ARG_PARKING_ADDRESS, parkingAddress)
+            putDouble(ParkingDetailsFragment.ARG_PRICE_PER_HOUR, spot?.pricePerHourFourWheeler ?: 50.0)
+            putDouble(ParkingDetailsFragment.ARG_LATITUDE, latitude)
+            putDouble(ParkingDetailsFragment.ARG_LONGITUDE, longitude)
+            putInt(ParkingDetailsFragment.ARG_AVAILABLE_SPOTS, spot?.getTotalAvailableSpots() ?: 25)
+            putInt(ParkingDetailsFragment.ARG_TOTAL_SPOTS, spot?.getTotalSpots() ?: 100)
+            putFloat(ParkingDetailsFragment.ARG_RATING, spot?.rating?.toFloat() ?: 4.5f)
+            // Pass image URL if available
+            spot?.images?.firstOrNull()?.let { putString("parking_image", it) }
+        }
+        
+        parentFragment?.findNavController()?.navigate(
+            R.id.action_home_to_parkingDetails,
+            bundle
+        )
     }
 
     private fun updateSaveButton() {

@@ -6,13 +6,16 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.parkover.R
 import com.example.parkover.data.model.Booking
 import com.example.parkover.data.model.BookingStatus
+import com.example.parkover.data.repository.BookingRepository
 import com.example.parkover.databinding.FragmentBookingBinding
 import com.example.parkover.ui.adapters.BookingAdapter
 import com.example.parkover.utils.showToast
+import kotlinx.coroutines.launch
 
 class BookingFragment : Fragment() {
 
@@ -20,6 +23,7 @@ class BookingFragment : Fragment() {
     private val binding get() = _binding!!
     
     private lateinit var adapter: BookingAdapter
+    private val repository = BookingRepository()
     private var isOngoingSelected = true
 
     override fun onCreateView(
@@ -41,6 +45,7 @@ class BookingFragment : Fragment() {
     private fun setupAdapter() {
         adapter = BookingAdapter { booking ->
             context?.showToast("Opening booking: ${booking.parkingName}")
+            // TODO: Navigate to booking details
         }
         
         binding.rvBookings.apply {
@@ -92,61 +97,37 @@ class BookingFragment : Fragment() {
     }
 
     private fun loadBookings() {
-        // Mock ongoing bookings
-        val ongoingBookings = listOf(
-            Booking(
-                id = "1",
-                parkingName = "Allington Paddock",
-                parkingAddress = "7518 Washington Alley",
-                durationHours = 2,
-                totalPrice = 6.58,
-                bookingStatus = BookingStatus.ACTIVE
-            ),
-            Booking(
-                id = "2",
-                parkingName = "Appleton Warren",
-                parkingAddress = "8499 Red Could Coast",
-                durationHours = 2,
-                totalPrice = 8.98,
-                bookingStatus = BookingStatus.ACTIVE
-            )
-        )
+        binding.progressBar?.visibility = View.VISIBLE
         
-        // Mock completed bookings
-        val completedBookings = listOf(
-            Booking(
-                id = "3",
-                parkingName = "Banfield Road",
-                parkingAddress = "970 Division Center",
-                durationHours = 2,
-                totalPrice = 7.34,
-                bookingStatus = BookingStatus.COMPLETED
-            ),
-            Booking(
-                id = "4",
-                parkingName = "Beach Furlong",
-                parkingAddress = "8638 Waubesg Plaza",
-                durationHours = 2,
-                totalPrice = 5.66,
-                bookingStatus = BookingStatus.COMPLETED
-            )
-        )
-
-        val bookings = if (isOngoingSelected) ongoingBookings else completedBookings
-        
-        if (bookings.isEmpty()) {
-            binding.emptyState.visibility = View.VISIBLE
-            binding.rvBookings.visibility = View.GONE
-            binding.tvEmptyTitle.text = if (isOngoingSelected) "No Ongoing Bookings" else "No Completed Bookings"
-            binding.tvEmptySubtitle.text = if (isOngoingSelected) 
-                "Your active parking bookings\nwill appear here" 
-            else 
-                "Your past parking bookings\nwill appear here"
-        } else {
-            binding.emptyState.visibility = View.GONE
-            binding.rvBookings.visibility = View.VISIBLE
-            adapter.submitList(bookings)
+        lifecycleScope.launch {
+            val bookings = if (isOngoingSelected) {
+                repository.getOngoingBookings()
+            } else {
+                repository.getCompletedBookings()
+            }
+            
+            binding.progressBar?.visibility = View.GONE
+            
+            if (bookings.isEmpty()) {
+                binding.emptyState.visibility = View.VISIBLE
+                binding.rvBookings.visibility = View.GONE
+                binding.tvEmptyTitle.text = if (isOngoingSelected) "No Ongoing Bookings" else "No Completed Bookings"
+                binding.tvEmptySubtitle.text = if (isOngoingSelected) 
+                    "Your active parking bookings\nwill appear here" 
+                else 
+                    "Your past parking bookings\nwill appear here"
+            } else {
+                binding.emptyState.visibility = View.GONE
+                binding.rvBookings.visibility = View.VISIBLE
+                adapter.submitList(bookings)
+            }
         }
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        // Refresh bookings when returning to this fragment
+        loadBookings()
     }
 
     override fun onDestroyView() {

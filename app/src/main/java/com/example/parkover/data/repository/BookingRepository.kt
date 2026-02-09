@@ -63,8 +63,95 @@ class BookingRepository {
     
     // Get floors and spots for a parking location
     suspend fun getFloorsWithSpots(parkingId: String, vehicleType: VehicleType): List<FloorData> {
-        // For now, return mock data - will be replaced with Firestore
-        return generateMockFloors(vehicleType)
+        // Try to get real floor data from Firestore first
+        return try {
+            val parkingDoc = parkingSpotsCollection.document(parkingId).get().await()
+            val parkingSpot = parkingDoc.toObject(ParkingSpot::class.java)
+            
+            if (parkingSpot != null && parkingSpot.floors.isNotEmpty()) {
+                // Convert API floors to FloorData with spots
+                parkingSpot.floors.map { floor ->
+                    val spots = generateSpotsForFloor(
+                        parkingId = parkingId,
+                        floorNumber = floor.floorNumber,
+                        totalSpots = floor.totalSpots,
+                        availableSpots = floor.availableSpots,
+                        vehicleType = vehicleType
+                    )
+                    FloorData(
+                        floorNumber = floor.floorNumber,
+                        name = floor.name,
+                        spots = spots,
+                        totalSpots = floor.totalSpots,
+                        availableSpots = floor.availableSpots
+                    )
+                }
+            } else {
+                // Fallback to mock data
+                generateMockFloors(vehicleType)
+            }
+        } catch (e: Exception) {
+            // Fallback to mock data on error
+            generateMockFloors(vehicleType)
+        }
+    }
+    
+    // Generate spots for a floor based on availability
+    private suspend fun generateSpotsForFloor(
+        parkingId: String,
+        floorNumber: Int,
+        totalSpots: Int,
+        availableSpots: Int,
+        vehicleType: VehicleType
+    ): List<ParkingSlot> {
+        val spots = mutableListOf<ParkingSlot>()
+        val occupiedCount = totalSpots - availableSpots
+        
+        // Get booked spots from Firestore
+        val bookedSpots = try {
+            bookingsCollection
+                .whereEqualTo("parkingId", parkingId)
+                .whereEqualTo("floorNumber", floorNumber)
+                .whereIn("bookingStatus", listOf(
+                    BookingStatus.CONFIRMED.name,
+                    BookingStatus.ACTIVE.name
+                ))
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.getString("spotNumber") }
+                .toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+        
+        val spotsPerRow = 2
+        val totalRows = (totalSpots + 1) / 2
+        
+        for (row in 0 until totalRows) {
+            for (col in 0 until spotsPerRow) {
+                val spotIndex = row * 2 + col
+                if (spotIndex >= totalSpots) break
+                
+                val spotNumber = "${('A' + floorNumber - 1)}${String.format("%02d", spotIndex + 1)}"
+                val isBooked = bookedSpots.contains(spotNumber) || spotIndex < occupiedCount
+                
+                spots.add(
+                    ParkingSlot(
+                        id = "${parkingId}_${floorNumber}_${spotNumber}",
+                        spotNumber = spotNumber,
+                        floorNumber = floorNumber,
+                        isAvailable = !isBooked,
+                        isBooked = isBooked,
+                        vehicleType = vehicleType,
+                        row = row,
+                        column = col
+                    )
+                )
+            }
+        }
+        
+        return spots
     }
     
     // Check if a spot is available for the given time range
@@ -114,7 +201,59 @@ class BookingRepository {
                 updatedAt = Timestamp.now()
             )
             
-            bookingsCollection.document(bookingId).set(newBooking).await()
+            // Use transaction to create booking and update availability atomically
+            firestore.runTransaction { transaction ->
+                // Create the booking
+                val bookingRef = bookingsCollection.document(bookingId)
+                transaction.set(bookingRef, newBooking)
+                
+                // Update availability in parking_availability collection
+                val availRef = firestore.collection("parking_availability").document(booking.parkingId)
+                val availSnapshot = transaction.get(availRef)
+                
+                if (availSnapshot.exists()) {
+                    val updates = mutableMapOf<String, Any>()
+                    
+                    // Decrease availability based on vehicle type
+                    when (booking.vehicleType) {
+                        VehicleType.TWO_WHEELER -> {
+                            val current = availSnapshot.getLong("availableSpotsTwoWheeler") ?: 0
+                            if (current > 0) {
+                                updates["availableSpotsTwoWheeler"] = current - 1
+                            }
+                        }
+                        VehicleType.FOUR_WHEELER -> {
+                            val current = availSnapshot.getLong("availableSpotsFourWheeler") ?: 0
+                            if (current > 0) {
+                                updates["availableSpotsFourWheeler"] = current - 1
+                            }
+                        }
+                        VehicleType.HEAVY -> {
+                            val current = availSnapshot.getLong("availableSpotsHeavy") ?: 0
+                            if (current > 0) {
+                                updates["availableSpotsHeavy"] = current - 1
+                            }
+                        }
+                    }
+                    
+                    // Update floor availability if floor is specified
+                    if (booking.floorNumber > 0) {
+                        @Suppress("UNCHECKED_CAST")
+                        val floorAvail = (availSnapshot.get("floorAvailability") as? Map<String, Long>)?.toMutableMap()
+                            ?: mutableMapOf()
+                        val floorKey = booking.floorNumber.toString()
+                        val currentFloor = floorAvail[floorKey] ?: 0
+                        if (currentFloor > 0) {
+                            floorAvail[floorKey] = currentFloor - 1
+                            updates["floorAvailability"] = floorAvail
+                        }
+                    }
+                    
+                    updates["lastUpdated"] = Timestamp.now()
+                    transaction.update(availRef, updates)
+                }
+            }.await()
+            
             Result.success(newBooking)
         } catch (e: Exception) {
             Result.failure(e)

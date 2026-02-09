@@ -18,17 +18,21 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import coil.load
 import coil.transform.CircleCropTransformation
 import com.example.parkover.R
+import com.example.parkover.data.model.ParkingSpot
 import com.example.parkover.data.model.SearchResult
+import com.example.parkover.data.repository.ApiResult
 import com.example.parkover.databinding.FragmentHomeBinding
 import com.example.parkover.ui.adapters.SearchResultAdapter
 import com.example.parkover.utils.LocationHelper
 import com.example.parkover.utils.showToast
+import com.example.parkover.viewmodels.ParkingViewModel
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
@@ -62,6 +66,9 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+    
+    // ViewModel for parking data
+    private val parkingViewModel: ParkingViewModel by viewModels()
 
     private lateinit var locationHelper: LocationHelper
     private lateinit var searchAdapter: SearchResultAdapter
@@ -77,8 +84,11 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     private var selectedLocation: LatLng? = null
     private var selectedLocationName: String = ""
     private var selectedLocationAddress: String = ""
-    private var selectedParkingSpot: ParkingSpotData? = null
+    private var selectedParkingSpot: ParkingSpot? = null
     private var currentRouteDistance: String = ""
+    
+    // All parking spots from API
+    private var allParkingSpots: List<ParkingSpot> = emptyList()
     
     private var searchJob: Job? = null
     private var sessionToken: AutocompleteSessionToken? = null
@@ -130,6 +140,28 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         setupSearchAdapter()
         setupUI()
         loadUserProfile()
+        observeParkingData()
+    }
+    
+    private fun observeParkingData() {
+        // Observe parking spots from ViewModel (API + Firestore merged)
+        parkingViewModel.parkingSpots.observe(viewLifecycleOwner) { result ->
+            when (result) {
+                is ApiResult.Loading -> {
+                    binding.progressBar.visibility = View.VISIBLE
+                }
+                is ApiResult.Success -> {
+                    binding.progressBar.visibility = View.GONE
+                    allParkingSpots = result.data
+                    // Show parking spots on map if we have current location
+                    currentLocation?.let { showNearbyParkingSpots(it) }
+                }
+                is ApiResult.Error -> {
+                    binding.progressBar.visibility = View.GONE
+                    context?.showToast("Failed to load parking spots: ${result.message}")
+                }
+            }
+        }
     }
 
     private fun setupMap() {
@@ -172,12 +204,15 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         
         // Marker click listener for parking spots
         map.setOnMarkerClickListener { marker ->
-            val parkingData = marker.tag as? ParkingSpotData
-            if (parkingData != null) {
-                selectedParkingSpot = parkingData
-                selectedLocationName = parkingData.name
-                selectedLocationAddress = parkingData.address
+            val parkingSpot = marker.tag as? ParkingSpot
+            if (parkingSpot != null) {
+                selectedParkingSpot = parkingSpot
+                selectedLocationName = parkingSpot.name
+                selectedLocationAddress = parkingSpot.address
                 selectedLocation = marker.position
+                
+                // Select in ViewModel for details screen
+                parkingViewModel.selectParkingSpot(parkingSpot)
                 
                 // Draw route to parking spot
                 drawRouteToParking(marker.position)
@@ -578,41 +613,68 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         imm.hideSoftInputFromWindow(binding.etSearch.windowToken, 0)
     }
 
-    // Show nearby parking spots (mock data for now - will be replaced with Firestore data)
+    // Show nearby parking spots from API data with real-time availability
     private fun showNearbyParkingSpots(center: LatLng) {
         // Clear existing parking markers
         parkingMarkers.forEach { it.remove() }
         parkingMarkers.clear()
 
-        // Mock parking spots around the center location
-        val mockParkingSpots = listOf(
-            ParkingSpotData("P1", "City Center Parking", "123 Main Street", center.latitude + 0.003, center.longitude + 0.002, 50.0, 4.5f, 25),
-            ParkingSpotData("P2", "Mall Parking Complex", "456 Shopping Ave", center.latitude - 0.002, center.longitude + 0.004, 40.0, 4.2f, 100),
-            ParkingSpotData("P3", "Metro Station Parking", "789 Transit Road", center.latitude + 0.001, center.longitude - 0.003, 30.0, 4.0f, 50),
-            ParkingSpotData("P4", "Office Tower Parking", "321 Business Blvd", center.latitude - 0.004, center.longitude - 0.001, 60.0, 4.7f, 75),
-            ParkingSpotData("P5", "Hospital Parking", "555 Health Lane", center.latitude + 0.005, center.longitude + 0.001, 35.0, 3.8f, 40)
-        )
+        // Filter parking spots within 5km radius
+        val nearbySpots = allParkingSpots.filter { spot ->
+            val distance = calculateDistance(
+                center.latitude, center.longitude,
+                spot.latitude, spot.longitude
+            )
+            distance <= 5.0 && spot.isActive
+        }.sortedBy { spot ->
+            calculateDistance(center.latitude, center.longitude, spot.latitude, spot.longitude)
+        }
 
-        mockParkingSpots.forEach { spot ->
+        nearbySpots.forEach { spot ->
+            val availableSpots = spot.getTotalAvailableSpots()
+            val markerIcon = when (spot.getAvailabilityStatus()) {
+                com.example.parkover.data.model.AvailabilityStatus.FULL -> createParkingMarkerIcon(Color.RED)
+                com.example.parkover.data.model.AvailabilityStatus.LIMITED -> createParkingMarkerIcon(Color.parseColor("#FFA500"))
+                com.example.parkover.data.model.AvailabilityStatus.AVAILABLE -> createParkingMarkerIcon()
+            }
+            
             val marker = googleMap?.addMarker(
                 MarkerOptions()
                     .position(LatLng(spot.latitude, spot.longitude))
-                    .icon(createParkingMarkerIcon())
+                    .icon(markerIcon)
                     .title(spot.name)
-                    .snippet("₹${spot.pricePerHour.toInt()}/hr • ${spot.availableSpots} spots")
+                    .snippet("₹${spot.pricePerHourFourWheeler.toInt()}/hr • $availableSpots spots")
             )
             marker?.tag = spot
             marker?.let { parkingMarkers.add(it) }
         }
+        
+        if (nearbySpots.isEmpty() && allParkingSpots.isEmpty()) {
+            // Show loading state or retry
+            Log.d("HomeFragment", "No parking spots loaded yet")
+        }
+    }
+    
+    // Calculate distance between two points (Haversine formula)
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371 // Earth's radius in km
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2)
+        val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+        return r * c
     }
 
 
-    private fun createParkingMarkerIcon(): BitmapDescriptor {
+    private fun createParkingMarkerIcon(color: Int = Color.parseColor("#613EEA")): BitmapDescriptor {
         val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.ic_parking_marker)
         drawable?.let {
             val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             it.setBounds(0, 0, canvas.width, canvas.height)
+            it.setTint(color)
             it.draw(canvas)
             return BitmapDescriptorFactory.fromBitmap(bitmap)
         }
@@ -784,6 +846,7 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     private fun showParkingDetailsBottomSheet() {
         val spot = selectedParkingSpot
         val bottomSheet = ParkingDetailsBottomSheet.newInstance(
+            parkingSpot = spot,
             name = spot?.name ?: selectedLocationName,
             address = spot?.address ?: selectedLocationAddress,
             latitude = selectedLocation?.latitude ?: 0.0,
@@ -800,14 +863,3 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         _binding = null
     }
 }
-
-data class ParkingSpotData(
-    val id: String,
-    val name: String,
-    val address: String,
-    val latitude: Double,
-    val longitude: Double,
-    val pricePerHour: Double,
-    val rating: Float,
-    val availableSpots: Int
-)
