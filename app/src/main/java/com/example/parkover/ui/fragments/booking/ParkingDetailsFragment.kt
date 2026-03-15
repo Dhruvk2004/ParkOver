@@ -124,22 +124,8 @@ class ParkingDetailsFragment : Fragment() {
             }
         }
         
-        // Show amenities if available
-        selectedSpot?.amenities?.let { amenities ->
-            if (amenities.isNotEmpty()) {
-                binding.tvAmenities?.text = amenities.joinToString(" • ")
-            }
-        }
-        
-        // Show operating hours
-        selectedSpot?.operatingHours?.let { hours ->
-            val hoursText = if (hours.is24Hours) {
-                "Open 24 Hours"
-            } else {
-                "Open: ${hours.openTime} - ${hours.closeTime}"
-            }
-            binding.tvOperatingHours?.text = hoursText
-        }
+        // Note: tvAmenities and tvOperatingHours views are not in the current layout
+        // Amenities and operating hours info is included in the description text
     }
     
     private fun buildDescription(spot: com.example.parkover.data.model.ParkingSpot): String {

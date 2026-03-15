@@ -79,7 +79,7 @@ data class OperatingHoursApi(
     @SerializedName("is24Hours") val is24Hours: Boolean,
     @SerializedName("openTime") val openTime: String,
     @SerializedName("closeTime") val closeTime: String,
-    @SerializedName("closedDays") val closedDays: List<Int>
+    @SerializedName("closedDays") val closedDays: List<String>
 )
 
 data class AmenityApi(

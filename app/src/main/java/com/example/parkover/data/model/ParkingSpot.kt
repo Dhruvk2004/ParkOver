@@ -65,7 +65,7 @@ data class OperatingHours(
     val is24Hours: Boolean = false,
     val openTime: String = "06:00", // HH:mm format
     val closeTime: String = "22:00",
-    val closedDays: List<Int> = emptyList() // 0 = Sunday, 6 = Saturday
+    val closedDays: List<String> = emptyList() // e.g., "Sunday", "Saturday"
 ) {
     constructor() : this(is24Hours = false)
 }

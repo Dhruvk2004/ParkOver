@@ -84,6 +84,9 @@ dependencies {
     // Image Loading
     implementation(libs.coil)
     
+    // Lottie Animations
+    implementation("com.airbnb.android:lottie:6.3.0")
+    
     // QR Code
     implementation(libs.zxing.core)
     implementation(libs.zxing.android.embedded)

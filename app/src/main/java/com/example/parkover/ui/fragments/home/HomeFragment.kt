@@ -149,15 +149,22 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
             when (result) {
                 is ApiResult.Loading -> {
                     binding.progressBar.visibility = View.VISIBLE
+                    Log.d("HomeFragment", "Loading parking spots...")
                 }
                 is ApiResult.Success -> {
                     binding.progressBar.visibility = View.GONE
                     allParkingSpots = result.data
+                    Log.d("HomeFragment", "Received ${result.data.size} parking spots from ViewModel")
+                    if (result.data.isNotEmpty()) {
+                        val first = result.data.first()
+                        Log.d("HomeFragment", "First spot: ${first.name} at (${first.latitude}, ${first.longitude})")
+                    }
                     // Show parking spots on map if we have current location
                     currentLocation?.let { showNearbyParkingSpots(it) }
                 }
                 is ApiResult.Error -> {
                     binding.progressBar.visibility = View.GONE
+                    Log.e("HomeFragment", "Failed to load parking spots: ${result.message}")
                     context?.showToast("Failed to load parking spots: ${result.message}")
                 }
             }
@@ -618,6 +625,9 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
         // Clear existing parking markers
         parkingMarkers.forEach { it.remove() }
         parkingMarkers.clear()
+        
+        Log.d("HomeFragment", "showNearbyParkingSpots called at center: (${center.latitude}, ${center.longitude})")
+        Log.d("HomeFragment", "Total parking spots available: ${allParkingSpots.size}")
 
         // Filter parking spots within 5km radius
         val nearbySpots = allParkingSpots.filter { spot ->
@@ -625,10 +635,16 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
                 center.latitude, center.longitude,
                 spot.latitude, spot.longitude
             )
-            distance <= 5.0 && spot.isActive
+            val isNearby = distance <= 5.0 && spot.isActive
+            if (!isNearby && allParkingSpots.size <= 10) {
+                Log.d("HomeFragment", "Spot ${spot.name} at distance ${String.format("%.2f", distance)}km - filtered out")
+            }
+            isNearby
         }.sortedBy { spot ->
             calculateDistance(center.latitude, center.longitude, spot.latitude, spot.longitude)
         }
+        
+        Log.d("HomeFragment", "Found ${nearbySpots.size} nearby spots within 5km")
 
         nearbySpots.forEach { spot ->
             val availableSpots = spot.getTotalAvailableSpots()
@@ -669,12 +685,18 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
 
 
     private fun createParkingMarkerIcon(color: Int = Color.parseColor("#613EEA")): BitmapDescriptor {
-        val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.ic_parking_marker)
+        // Use modern marker with larger size for better visibility
+        val drawable = ContextCompat.getDrawable(requireContext(), R.drawable.ic_parking_marker_modern)
         drawable?.let {
-            val bitmap = Bitmap.createBitmap(80, 80, Bitmap.Config.ARGB_8888)
+            val width = 56
+            val height = 72
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            it.setBounds(0, 0, canvas.width, canvas.height)
-            it.setTint(color)
+            it.setBounds(0, 0, width, height)
+            // Apply color tint for status indication
+            if (color != Color.parseColor("#613EEA")) {
+                it.setTint(color)
+            }
             it.draw(canvas)
             return BitmapDescriptorFactory.fromBitmap(bitmap)
         }
@@ -682,11 +704,19 @@ class HomeFragment : Fragment(), OnMapReadyCallback {
     }
 
     private fun getBitmapFromVector(vectorResId: Int): BitmapDescriptor {
-        val drawable = ContextCompat.getDrawable(requireContext(), vectorResId)
+        // Use modern destination marker
+        val actualResId = if (vectorResId == R.drawable.ic_destination_marker) {
+            R.drawable.ic_destination_marker_modern
+        } else {
+            vectorResId
+        }
+        val drawable = ContextCompat.getDrawable(requireContext(), actualResId)
         drawable?.let {
-            val bitmap = Bitmap.createBitmap(60, 60, Bitmap.Config.ARGB_8888)
+            val width = if (actualResId == R.drawable.ic_destination_marker_modern) 48 else 60
+            val height = if (actualResId == R.drawable.ic_destination_marker_modern) 64 else 60
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
-            it.setBounds(0, 0, canvas.width, canvas.height)
+            it.setBounds(0, 0, width, height)
             it.draw(canvas)
             return BitmapDescriptorFactory.fromBitmap(bitmap)
         }

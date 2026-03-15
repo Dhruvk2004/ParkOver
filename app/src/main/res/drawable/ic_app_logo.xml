@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="120dp"
+    android:viewportWidth="120"
+    android:viewportHeight="120">
+    
+    <!-- Outer gradient circle -->
+    <path
+        android:fillColor="#613EEA"
+        android:pathData="M60,10 C87.6,10 110,32.4 110,60 C110,87.6 87.6,110 60,110 C32.4,110 10,87.6 10,60 C10,32.4 32.4,10 60,10Z"/>
+    
+    <!-- Inner lighter circle -->
+    <path
+        android:fillColor="#7B5CF5"
+        android:pathData="M60,18 C82.1,18 100,35.9 100,58 C100,80.1 82.1,98 60,98 C37.9,98 20,80.1 20,58 C20,35.9 37.9,18 60,18Z"
+        android:fillAlpha="0.3"/>
+    
+    <!-- Location pin shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M60,25 C45.1,25 33,37.1 33,52 C33,71 60,95 60,95 C60,95 87,71 87,52 C87,37.1 74.9,25 60,25Z"/>
+    
+    <!-- Inner purple circle in pin -->
+    <path
+        android:fillColor="#613EEA"
+        android:pathData="M60,35 C69.4,35 77,42.6 77,52 C77,61.4 69.4,69 60,69 C50.6,69 43,61.4 43,52 C43,42.6 50.6,35 60,35Z"/>
+    
+    <!-- P letter in center -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,42 L52,62 L56,62 L56,55 L62,55 C66.4,55 70,51.4 70,47 C70,42.6 66.4,39 62,39 L52,39 L52,42Z M56,43 L62,43 C64.2,43 66,44.8 66,47 C66,49.2 64.2,51 62,51 L56,51 L56,43Z"/>
+    
+    <!-- Decorative dots -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.6"
+        android:pathData="M25,45 m-3,0 a3,3 0 1,1 6,0 a3,3 0 1,1 -6,0"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.4"
+        android:pathData="M95,75 m-2.5,0 a2.5,2.5 0 1,1 5,0 a2.5,2.5 0 1,1 -5,0"/>
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.5"
+        android:pathData="M30,80 m-2,0 a2,2 0 1,1 4,0 a2,2 0 1,1 -4,0"/>
+</vector>

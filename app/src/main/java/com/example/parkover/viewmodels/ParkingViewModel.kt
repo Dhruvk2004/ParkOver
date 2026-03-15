@@ -9,11 +9,14 @@ import com.example.parkover.data.api.VehiclesResponse
 import com.example.parkover.data.model.ParkingAvailability
 import com.example.parkover.data.model.ParkingSpot
 import com.example.parkover.data.model.VehicleType
+import android.util.Log
 import com.example.parkover.data.repository.ApiResult
 import com.example.parkover.data.repository.AvailabilityRepository
 import com.example.parkover.data.repository.ParkingRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+
+private const val TAG = "ParkingViewModel"
 
 class ParkingViewModel : ViewModel() {
     
@@ -56,15 +59,23 @@ class ParkingViewModel : ViewModel() {
     fun loadParkingSpots() {
         _parkingSpots.value = ApiResult.Loading
         viewModelScope.launch {
+            Log.d(TAG, "Loading parking spots from API...")
             when (val result = parkingRepository.getParkingSpots()) {
                 is ApiResult.Success -> {
                     staticParkingSpots = result.data
+                    Log.d(TAG, "Loaded ${result.data.size} parking spots from API")
+                    result.data.take(3).forEach { spot ->
+                        Log.d(TAG, "Sample spot: ${spot.name} at (${spot.latitude}, ${spot.longitude})")
+                    }
                     // Initialize availability in Firestore for new spots
                     availabilityRepository.checkAndInitializeAvailability(result.data)
                     // Merge with current availability
                     mergeWithAvailability()
                 }
-                is ApiResult.Error -> _parkingSpots.value = result
+                is ApiResult.Error -> {
+                    Log.e(TAG, "Failed to load parking spots: ${result.message}")
+                    _parkingSpots.value = result
+                }
                 is ApiResult.Loading -> {}
             }
         }
@@ -80,9 +91,13 @@ class ParkingViewModel : ViewModel() {
     }
     
     private fun mergeWithAvailability() {
-        if (staticParkingSpots.isEmpty()) return
+        if (staticParkingSpots.isEmpty()) {
+            Log.w(TAG, "mergeWithAvailability: No static parking spots to merge")
+            return
+        }
         
         val availMap = _availabilityMap.value ?: emptyMap()
+        Log.d(TAG, "Merging ${staticParkingSpots.size} spots with ${availMap.size} availability records")
         
         val mergedSpots = staticParkingSpots.map { spot ->
             val availability = availMap[spot.id]

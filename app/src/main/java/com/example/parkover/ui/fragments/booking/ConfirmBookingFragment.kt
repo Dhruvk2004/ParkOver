@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
 import com.example.parkover.R
@@ -90,6 +91,17 @@ class ConfirmBookingFragment : Fragment() {
         TimePickerDialog(
             requireContext(),
             { _, selectedHour, selectedMinute ->
+                val selectedCalendar = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, selectedHour)
+                    set(Calendar.MINUTE, selectedMinute)
+                }
+                
+                // Validate that selected time is in the future
+                if (selectedCalendar.timeInMillis <= System.currentTimeMillis()) {
+                    Toast.makeText(requireContext(), "Please select a future time", Toast.LENGTH_SHORT).show()
+                    return@TimePickerDialog
+                }
+                
                 calendar.set(Calendar.HOUR_OF_DAY, selectedHour)
                 calendar.set(Calendar.MINUTE, selectedMinute)
                 

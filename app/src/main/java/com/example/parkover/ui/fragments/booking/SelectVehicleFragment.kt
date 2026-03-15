@@ -142,9 +142,13 @@ class SelectVehicleFragment : Fragment() {
     }
     
     private suspend fun createDefaultVehicles(userId: String?): List<Vehicle> {
+        // Generate unique IDs for each user's default vehicles
+        val userPrefix = userId?.take(8) ?: "guest"
+        val timestamp = System.currentTimeMillis()
+        
         val defaultVehicles = listOf(
             Vehicle(
-                id = "default_v1",
+                id = "${userPrefix}_v1_$timestamp",
                 userId = userId ?: "",
                 type = VehicleType.FOUR_WHEELER,
                 brand = "4x4",
@@ -153,7 +157,7 @@ class SelectVehicleFragment : Fragment() {
                 imageResId = R.drawable.car_truck
             ),
             Vehicle(
-                id = "default_v2",
+                id = "${userPrefix}_v2_$timestamp",
                 userId = userId ?: "",
                 type = VehicleType.FOUR_WHEELER,
                 brand = "Toyota",
@@ -162,7 +166,7 @@ class SelectVehicleFragment : Fragment() {
                 imageResId = R.drawable.car_land_cruiser
             ),
             Vehicle(
-                id = "default_v3",
+                id = "${userPrefix}_v3_$timestamp",
                 userId = userId ?: "",
                 type = VehicleType.FOUR_WHEELER,
                 brand = "KIA",
@@ -171,7 +175,7 @@ class SelectVehicleFragment : Fragment() {
                 imageResId = R.drawable.car_suv_orange
             ),
             Vehicle(
-                id = "default_v4",
+                id = "${userPrefix}_v4_$timestamp",
                 userId = userId ?: "",
                 type = VehicleType.FOUR_WHEELER,
                 brand = "Honda",

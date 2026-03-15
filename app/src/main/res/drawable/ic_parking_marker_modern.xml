@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="56dp"
+    android:height="72dp"
+    android:viewportWidth="56"
+    android:viewportHeight="72">
+    
+    <!-- Shadow ellipse -->
+    <path
+        android:fillColor="#000000"
+        android:fillAlpha="0.2"
+        android:pathData="M28,68 m-12,0 a12,4 0 1,1 24,0 a12,4 0 1,1 -24,0"/>
+    
+    <!-- Pin body - main shape -->
+    <path
+        android:fillColor="#613EEA"
+        android:pathData="M28,4 C15.3,4 5,14.3 5,27 C5,44 28,64 28,64 C28,64 51,44 51,27 C51,14.3 40.7,4 28,4Z"/>
+    
+    <!-- Pin highlight (3D effect) -->
+    <path
+        android:fillColor="#7B5CF5"
+        android:pathData="M28,6 C16.4,6 7,15.4 7,27 C7,32 9,37 12,42 C18,35 28,28 28,28 C28,28 38,35 44,42 C47,37 49,32 49,27 C49,15.4 39.6,6 28,6Z"
+        android:fillAlpha="0.5"/>
+    
+    <!-- White inner circle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,14 C35.2,14 41,19.8 41,27 C41,34.2 35.2,40 28,40 C20.8,40 15,34.2 15,27 C15,19.8 20.8,14 28,14Z"/>
+    
+    <!-- P letter -->
+    <path
+        android:fillColor="#613EEA"
+        android:pathData="M22,19 L22,35 L26,35 L26,30 L30,30 C33.3,30 36,27.3 36,24 C36,20.7 33.3,18 30,18 L22,18 L22,19Z M26,22 L30,22 C31.1,22 32,22.9 32,24 C32,25.1 31.1,26 30,26 L26,26 L26,22Z"/>
+    
+    <!-- Shine effect -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.3"
+        android:pathData="M18,12 Q28,8 38,12 Q32,16 28,16 Q24,16 18,12Z"/>
+</vector>

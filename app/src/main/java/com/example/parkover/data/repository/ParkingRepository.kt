@@ -1,5 +1,6 @@
 package com.example.parkover.data.repository
 
+import android.util.Log
 import com.example.parkover.data.api.ParkingSpotApi
 import com.example.parkover.data.api.ParkingSpotsResponse
 import com.example.parkover.data.api.PresetVehicleApi
@@ -10,6 +11,8 @@ import com.example.parkover.data.model.OperatingHours
 import com.example.parkover.data.model.ParkingSpot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG = "ParkingRepository"
 
 sealed class ApiResult<out T> {
     data class Success<T>(val data: T) : ApiResult<T>()
@@ -36,13 +39,23 @@ class ParkingRepository {
     
     suspend fun getParkingSpotsData(): ApiResult<ParkingSpotsResponse> = withContext(Dispatchers.IO) {
         try {
+            Log.d(TAG, "Fetching parking spots from GitHub API...")
             val response = apiService.getParkingSpots()
+            Log.d(TAG, "API Response code: ${response.code()}")
             if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
+                val body = response.body()!!
+                Log.d(TAG, "Successfully fetched ${body.parkingSpots.size} parking spots")
+                if (body.parkingSpots.isNotEmpty()) {
+                    val first = body.parkingSpots.first()
+                    Log.d(TAG, "First spot from API: ${first.name} at (${first.latitude}, ${first.longitude})")
+                }
+                ApiResult.Success(body)
             } else {
+                Log.e(TAG, "API Error: ${response.code()} - ${response.message()}")
                 ApiResult.Error("Failed to fetch parking spots: ${response.message()}")
             }
         } catch (e: Exception) {
+            Log.e(TAG, "Network error fetching parking spots", e)
             ApiResult.Error("Network error: ${e.message}", e)
         }
     }
