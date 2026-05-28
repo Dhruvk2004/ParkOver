@@ -1,27 +1,28 @@
 package com.example.parkover.viewmodels
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.parkover.data.model.User
 import com.example.parkover.data.repository.AuthRepository
 import com.google.firebase.auth.FirebaseUser
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class AuthViewModel : ViewModel() {
-    
+
     private val repository = AuthRepository()
-    
-    private val _authState = MutableLiveData<AuthState>()
-    val authState: LiveData<AuthState> = _authState
-    
-    private val _currentUser = MutableLiveData<User?>()
-    val currentUser: LiveData<User?> = _currentUser
-    
+
+    private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    private val _currentUser = MutableStateFlow<User?>(null)
+    val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
+
     val isLoggedIn: Boolean
         get() = repository.isLoggedIn
-    
+
     fun signUpWithEmail(email: String, password: String) {
         _authState.value = AuthState.Loading
         viewModelScope.launch {
@@ -36,7 +37,7 @@ class AuthViewModel : ViewModel() {
             )
         }
     }
-    
+
     fun signInWithEmail(email: String, password: String) {
         _authState.value = AuthState.Loading
         viewModelScope.launch {
@@ -51,7 +52,7 @@ class AuthViewModel : ViewModel() {
             )
         }
     }
-    
+
     fun signInWithGoogle(idToken: String) {
         _authState.value = AuthState.Loading
         viewModelScope.launch {
@@ -66,7 +67,7 @@ class AuthViewModel : ViewModel() {
             )
         }
     }
-    
+
     fun loadCurrentUser() {
         repository.currentUser?.let { firebaseUser ->
             viewModelScope.launch {
@@ -82,13 +83,13 @@ class AuthViewModel : ViewModel() {
             }
         }
     }
-    
+
     fun signOut() {
         repository.signOut()
         _currentUser.value = null
         _authState.value = AuthState.SignedOut
     }
-    
+
     fun resetState() {
         _authState.value = AuthState.Idle
     }

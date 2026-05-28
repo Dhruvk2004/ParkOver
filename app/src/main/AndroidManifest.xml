@@ -34,9 +34,9 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key" />
 
-        <!-- Splash Activity - Launcher -->
+        <!-- New Compose Activity - Main Entry Point -->
         <activity
-            android:name=".ui.activities.SplashActivity"
+            android:name=".ParkOverActivity"
             android:exported="true"
             android:theme="@style/Theme.ParkOver.NoActionBar">
             <intent-filter>
@@ -44,30 +44,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- Start/Onboarding Activity -->
-        <activity
-            android:name=".ui.activities.StartActivity"
-            android:exported="false"
-            android:theme="@style/Theme.ParkOver.NoActionBar" />
-
-        <!-- Login Activity -->
-        <activity
-            android:name=".ui.activities.LoginActivity"
-            android:exported="false"
-            android:theme="@style/Theme.ParkOver.NoActionBar" />
-
-        <!-- SignUp Activity -->
-        <activity
-            android:name=".ui.activities.SignUpActivity"
-            android:exported="false"
-            android:theme="@style/Theme.ParkOver.NoActionBar" />
-
-        <!-- Main Activity with Bottom Navigation -->
-        <activity
-            android:name=".ui.activities.MainActivity"
-            android:exported="false"
-            android:theme="@style/Theme.ParkOver.NoActionBar" />
 
         <!-- FileProvider for Camera -->
         <provider

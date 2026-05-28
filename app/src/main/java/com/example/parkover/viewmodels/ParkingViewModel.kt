@@ -1,7 +1,6 @@
 package com.example.parkover.viewmodels
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.parkover.data.api.PresetVehicleApi
@@ -9,53 +8,55 @@ import com.example.parkover.data.api.VehiclesResponse
 import com.example.parkover.data.model.ParkingAvailability
 import com.example.parkover.data.model.ParkingSpot
 import com.example.parkover.data.model.VehicleType
-import android.util.Log
 import com.example.parkover.data.repository.ApiResult
 import com.example.parkover.data.repository.AvailabilityRepository
 import com.example.parkover.data.repository.ParkingRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private const val TAG = "ParkingViewModel"
 
 class ParkingViewModel : ViewModel() {
-    
+
     private val parkingRepository = ParkingRepository.getInstance()
     private val availabilityRepository = AvailabilityRepository.getInstance()
-    
+
     // Raw parking spots from GitHub (static data)
     private var staticParkingSpots: List<ParkingSpot> = emptyList()
-    
+
     // Parking Spots with real-time availability merged
-    private val _parkingSpots = MutableLiveData<ApiResult<List<ParkingSpot>>>()
-    val parkingSpots: LiveData<ApiResult<List<ParkingSpot>>> = _parkingSpots
-    
+    private val _parkingSpots = MutableStateFlow<ApiResult<List<ParkingSpot>>>(ApiResult.Loading)
+    val parkingSpots: StateFlow<ApiResult<List<ParkingSpot>>> = _parkingSpots.asStateFlow()
+
     // Real-time availability map
-    private val _availabilityMap = MutableLiveData<Map<String, ParkingAvailability>>()
-    val availabilityMap: LiveData<Map<String, ParkingAvailability>> = _availabilityMap
-    
+    private val _availabilityMap = MutableStateFlow<Map<String, ParkingAvailability>>(emptyMap())
+    val availabilityMap: StateFlow<Map<String, ParkingAvailability>> = _availabilityMap.asStateFlow()
+
     // Vehicles Data
-    private val _vehiclesData = MutableLiveData<ApiResult<VehiclesResponse>>()
-    val vehiclesData: LiveData<ApiResult<VehiclesResponse>> = _vehiclesData
-    
+    private val _vehiclesData = MutableStateFlow<ApiResult<VehiclesResponse>>(ApiResult.Loading)
+    val vehiclesData: StateFlow<ApiResult<VehiclesResponse>> = _vehiclesData.asStateFlow()
+
     // Preset Vehicles
-    private val _presetVehicles = MutableLiveData<ApiResult<List<PresetVehicleApi>>>()
-    val presetVehicles: LiveData<ApiResult<List<PresetVehicleApi>>> = _presetVehicles
-    
+    private val _presetVehicles = MutableStateFlow<ApiResult<List<PresetVehicleApi>>>(ApiResult.Loading)
+    val presetVehicles: StateFlow<ApiResult<List<PresetVehicleApi>>> = _presetVehicles.asStateFlow()
+
     // Selected parking spot for details
-    private val _selectedParkingSpot = MutableLiveData<ParkingSpot?>()
-    val selectedParkingSpot: LiveData<ParkingSpot?> = _selectedParkingSpot
-    
+    private val _selectedParkingSpot = MutableStateFlow<ParkingSpot?>(null)
+    val selectedParkingSpot: StateFlow<ParkingSpot?> = _selectedParkingSpot.asStateFlow()
+
     // Booking status
-    private val _bookingStatus = MutableLiveData<BookingStatus>()
-    val bookingStatus: LiveData<BookingStatus> = _bookingStatus
-    
+    private val _bookingStatus = MutableStateFlow<BookingStatus>(BookingStatus.Idle)
+    val bookingStatus: StateFlow<BookingStatus> = _bookingStatus.asStateFlow()
+
     init {
         loadParkingSpots()
         loadVehiclesData()
         observeAvailability()
     }
-    
+
     fun loadParkingSpots() {
         _parkingSpots.value = ApiResult.Loading
         viewModelScope.launch {
@@ -64,12 +65,7 @@ class ParkingViewModel : ViewModel() {
                 is ApiResult.Success -> {
                     staticParkingSpots = result.data
                     Log.d(TAG, "Loaded ${result.data.size} parking spots from API")
-                    result.data.take(3).forEach { spot ->
-                        Log.d(TAG, "Sample spot: ${spot.name} at (${spot.latitude}, ${spot.longitude})")
-                    }
-                    // Initialize availability in Firestore for new spots
                     availabilityRepository.checkAndInitializeAvailability(result.data)
-                    // Merge with current availability
                     mergeWithAvailability()
                 }
                 is ApiResult.Error -> {
@@ -80,7 +76,7 @@ class ParkingViewModel : ViewModel() {
             }
         }
     }
-    
+
     private fun observeAvailability() {
         viewModelScope.launch {
             availabilityRepository.getAllAvailabilityRealtime().collectLatest { availMap ->
@@ -89,16 +85,11 @@ class ParkingViewModel : ViewModel() {
             }
         }
     }
-    
+
     private fun mergeWithAvailability() {
-        if (staticParkingSpots.isEmpty()) {
-            Log.w(TAG, "mergeWithAvailability: No static parking spots to merge")
-            return
-        }
-        
-        val availMap = _availabilityMap.value ?: emptyMap()
-        Log.d(TAG, "Merging ${staticParkingSpots.size} spots with ${availMap.size} availability records")
-        
+        if (staticParkingSpots.isEmpty()) return
+
+        val availMap = _availabilityMap.value
         val mergedSpots = staticParkingSpots.map { spot ->
             val availability = availMap[spot.id]
             if (availability != null) {
@@ -115,33 +106,31 @@ class ParkingViewModel : ViewModel() {
                 spot
             }
         }
-        
         _parkingSpots.value = ApiResult.Success(mergedSpots)
     }
-    
+
     fun loadVehiclesData() {
         _vehiclesData.value = ApiResult.Loading
         viewModelScope.launch {
             _vehiclesData.value = parkingRepository.getVehiclesData()
         }
     }
-    
+
     fun loadPresetVehicles() {
         _presetVehicles.value = ApiResult.Loading
         viewModelScope.launch {
             _presetVehicles.value = parkingRepository.getPresetVehicles()
         }
     }
-    
+
     fun selectParkingSpot(spot: ParkingSpot) {
         _selectedParkingSpot.value = spot
     }
-    
+
     fun clearSelectedSpot() {
         _selectedParkingSpot.value = null
     }
-    
-    // Called when a booking is confirmed
+
     fun onBookingConfirmed(spotId: String, vehicleType: VehicleType, floorNumber: Int? = null) {
         viewModelScope.launch {
             _bookingStatus.value = BookingStatus.Processing
@@ -153,8 +142,7 @@ class ParkingViewModel : ViewModel() {
             }
         }
     }
-    
-    // Called when a booking ends or is cancelled
+
     fun onBookingEnded(spotId: String, vehicleType: VehicleType, floorNumber: Int? = null) {
         val spot = staticParkingSpots.find { it.id == spotId } ?: return
         viewModelScope.launch {
@@ -168,8 +156,7 @@ class ParkingViewModel : ViewModel() {
             )
         }
     }
-    
-    // Get parking spots near a location
+
     fun getParkingSpotsNearLocation(
         latitude: Double,
         longitude: Double,
@@ -183,13 +170,12 @@ class ParkingViewModel : ViewModel() {
             calculateDistance(latitude, longitude, spot.latitude, spot.longitude)
         }
     }
-    
-    // Haversine formula to calculate distance between two points
+
     private fun calculateDistance(
         lat1: Double, lon1: Double,
         lat2: Double, lon2: Double
     ): Double {
-        val r = 6371 // Earth's radius in km
+        val r = 6371
         val dLat = Math.toRadians(lat2 - lat1)
         val dLon = Math.toRadians(lon2 - lon1)
         val a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.google.services)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.compose.compiler)
     id("kotlin-parcelize")
 }
 
@@ -37,7 +38,7 @@ android {
         jvmTarget = "17"
     }
     buildFeatures {
-        viewBinding = true
+        compose = true
     }
 }
 
@@ -49,54 +50,67 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.annotation)
-    
+
     // Lifecycle
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    
-    // Navigation
-    implementation(libs.androidx.navigation.fragment.ktx)
-    implementation(libs.androidx.navigation.ui.ktx)
-    
+
+    // Compose
+    implementation(platform(libs.compose.bom))
+    implementation(libs.compose.ui)
+    implementation(libs.compose.ui.graphics)
+    implementation(libs.compose.ui.tooling.preview)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons)
+    implementation(libs.activity.compose)
+    implementation(libs.navigation.compose)
+    implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.lifecycle.viewmodel.compose)
+    debugImplementation(libs.compose.ui.tooling)
+
+    // Maps Compose
+    implementation(libs.maps.compose)
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth.ktx)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.firebase.storage.ktx)
-    
+
     // Location Services
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
-    
+
     // Google Maps & Places
     implementation(libs.play.services.maps)
     implementation(libs.places)
-    
+
     // Room Database
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
-    
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.play.services)
-    
+
     // Image Loading
     implementation(libs.coil)
-    
-    // Lottie Animations
-    implementation("com.airbnb.android:lottie:6.3.0")
-    
+    implementation(libs.coil.compose)
+
+    // Lottie
+    implementation(libs.lottie.compose)
+
     // QR Code
     implementation(libs.zxing.core)
     implementation(libs.zxing.android.embedded)
-    
+
     // Retrofit
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
-    
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

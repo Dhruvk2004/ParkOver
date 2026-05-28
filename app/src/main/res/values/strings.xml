@@ -3,7 +3,7 @@
     <string name="app_name">ParkOver</string>
     
     <!-- Google Maps API Key -->
-    <string name="google_maps_key">Place your Google API</string>
+    <string name="google_maps_key">AIzaSyBdTlleA6NyQta9251BQcAySgZcVqwIABw</string>
     
     <!-- Navigation -->
     <string name="nav_home">Home</string>
