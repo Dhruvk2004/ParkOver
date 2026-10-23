@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.example.parkover.ui.theme.Purple
 import com.example.parkover.ui.theme.TextPrimary
 import com.example.parkover.ui.theme.TextSecondary
+import com.example.parkover.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,7 +78,7 @@ fun HelpSupportScreen(onBack: () -> Unit) {
                 Text(
                     text = "✓",
                     fontSize = 48.sp,
-                    color = Color(0xFF4CAF50)
+                    color = SuccessGreen
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(

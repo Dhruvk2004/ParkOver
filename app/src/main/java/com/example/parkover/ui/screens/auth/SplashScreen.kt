@@ -34,6 +34,7 @@ import com.example.parkover.R
 import com.example.parkover.ui.theme.Purple
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
+import com.example.parkover.ui.theme.BackgroundDark
 
 @Composable
 fun SplashScreen(
@@ -65,7 +66,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A1A)),
+            .background(BackgroundDark),
         contentAlignment = Alignment.Center
     ) {
         Column(

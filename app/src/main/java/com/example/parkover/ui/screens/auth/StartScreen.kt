@@ -51,6 +51,8 @@ import com.example.parkover.R
 import com.example.parkover.ui.theme.Purple
 import com.example.parkover.ui.theme.PurpleDark
 import com.example.parkover.ui.theme.PurpleLight
+import com.example.parkover.ui.theme.TextPrimary
+import com.example.parkover.ui.theme.TextSecondary
 
 @Composable
 fun StartScreen(
@@ -145,7 +147,7 @@ fun StartScreen(
                 text = "ParkOver",
                 fontSize = 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
+                color = TextPrimary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.alpha(titleAlpha.value)
             )
@@ -155,7 +157,7 @@ fun StartScreen(
             Text(
                 text = "Smart parking, zero hassle.\nFind, book, and park in seconds.",
                 fontSize = 16.sp,
-                color = Color(0xFF6B6B6B),
+                color = TextSecondary,
                 textAlign = TextAlign.Center,
                 lineHeight = 24.sp,
                 modifier = Modifier.alpha(subtitleAlpha.value)

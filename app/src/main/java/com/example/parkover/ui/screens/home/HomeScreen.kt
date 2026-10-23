@@ -99,6 +99,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.URL
+import com.example.parkover.ui.theme.DividerColor
+import com.example.parkover.ui.theme.ErrorRed
+import com.example.parkover.ui.theme.SuccessGreen
+import androidx.compose.ui.graphics.toArgb
 
 @Composable
 fun HomeScreen(
@@ -186,7 +190,7 @@ fun HomeScreen(
             if (routePoints.isNotEmpty()) {
                 Polyline(
                     points = routePoints,
-                    color = androidx.compose.ui.graphics.Color(0xFF613EEA),
+                    color = Purple,
                     width = 14f,
                     geodesic = true
                 )
@@ -195,9 +199,9 @@ fun HomeScreen(
             // Parking spot markers
             parkingSpots.forEach { spot ->
                 val markerColor = when (spot.getAvailabilityStatus()) {
-                    AvailabilityStatus.FULL -> AndroidColor.RED
-                    AvailabilityStatus.LIMITED -> AndroidColor.parseColor("#FFA500")
-                    AvailabilityStatus.AVAILABLE -> AndroidColor.parseColor("#613EEA")
+                    AvailabilityStatus.FULL -> ErrorRed.toArgb()
+                    AvailabilityStatus.LIMITED -> WarningOrange.toArgb()
+                    AvailabilityStatus.AVAILABLE -> Purple.toArgb()
                 }
 
                 Marker(
@@ -410,7 +414,7 @@ private fun ParkingSpotBottomSheet(
                     .width(40.dp)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(Color(0xFFE0E0E0))
+                    .background(DividerColor)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -473,7 +477,7 @@ private fun ParkingSpotBottomSheet(
                     color = Purple
                 )
                 val availColor = when (spot.getAvailabilityStatus()) {
-                    AvailabilityStatus.AVAILABLE -> Color(0xFF4CAF50)
+                    AvailabilityStatus.AVAILABLE -> SuccessGreen
                     AvailabilityStatus.LIMITED -> WarningOrange
                     AvailabilityStatus.FULL -> Color.Red
                 }
@@ -596,7 +600,7 @@ private fun createCurrentLocationIcon(): BitmapDescriptor {
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     canvas.drawCircle(size / 2f, size / 2f, size / 2f, Paint().apply { color = AndroidColor.parseColor("#4D613EEA"); isAntiAlias = true })
-    canvas.drawCircle(size / 2f, size / 2f, size / 4f, Paint().apply { color = AndroidColor.parseColor("#613EEA"); isAntiAlias = true })
+    canvas.drawCircle(size / 2f, size / 2f, size / 4f, Paint().apply { color = Purple.toArgb(); isAntiAlias = true })
     canvas.drawCircle(size / 2f, size / 2f, size / 4f, Paint().apply { color = AndroidColor.WHITE; style = Paint.Style.STROKE; strokeWidth = 4f; isAntiAlias = true })
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
@@ -605,7 +609,7 @@ private fun createDestinationMarkerIcon(): BitmapDescriptor {
     val size = 80
     val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
-    val pinPaint = Paint().apply { color = AndroidColor.parseColor("#E53935"); isAntiAlias = true }
+    val pinPaint = Paint().apply { color = ErrorRed.toArgb(); isAntiAlias = true }
     canvas.drawCircle(size / 2f, size / 2.5f, size / 3f, pinPaint)
     canvas.drawCircle(size / 2f, size / 2.5f, size / 7f, Paint().apply { color = AndroidColor.WHITE; isAntiAlias = true })
     val path = android.graphics.Path().apply { moveTo(size / 2f - 10f, size / 1.8f); lineTo(size / 2f + 10f, size / 1.8f); lineTo(size / 2f, size.toFloat() - 4f); close() }

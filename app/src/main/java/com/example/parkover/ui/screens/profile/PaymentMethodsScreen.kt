@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.example.parkover.ui.theme.Purple
 import com.example.parkover.ui.theme.TextPrimary
 import com.example.parkover.ui.theme.TextSecondary
+import com.example.parkover.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +136,7 @@ fun PaymentMethodsScreen(onBack: () -> Unit) {
                 Text(
                     text = "Payment method saved successfully!",
                     fontSize = 14.sp,
-                    color = Color(0xFF4CAF50),
+                    color = SuccessGreen,
                     fontWeight = FontWeight.Medium
                 )
             }

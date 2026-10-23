@@ -53,6 +53,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import com.example.parkover.ui.theme.DividerColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -273,7 +274,7 @@ private fun ToggleRow(
                 .width(52.dp)
                 .height(28.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(if (checked) Purple else Color(0xFFE0E0E0))
+                .background(if (checked) Purple else DividerColor)
                 .border(
                     width = 1.5.dp,
                     color = if (checked) Purple else Color(0xFFBDBDBD),

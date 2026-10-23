@@ -7,7 +7,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,13 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.parkover.navigation.Screen
@@ -47,9 +39,33 @@ import com.example.parkover.ui.theme.NavInactive
 import com.example.parkover.ui.theme.Purple
 import com.example.parkover.viewmodels.AuthViewModel
 import com.example.parkover.viewmodels.ParkingViewModel
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import com.example.parkover.R
+import com.example.parkover.ui.theme.NavSurface
+import com.example.parkover.ui.theme.PurpleDark
 
 data class BottomNavItem(
-    val icon: ImageVector,
+    @DrawableRes val icon: Int,
+    @DrawableRes val selectedIcon: Int,
     val label: String
 )
 
@@ -64,10 +80,10 @@ fun MainScreen(
     var previousTab by remember { mutableIntStateOf(initialTab) }
 
     val navItems = listOf(
-        BottomNavItem(Icons.Default.Home, "Home"),
-        BottomNavItem(Icons.Default.Bookmark, "Saved"),
-        BottomNavItem(Icons.Default.CalendarMonth, "Booking"),
-        BottomNavItem(Icons.Default.Person, "Profile")
+        BottomNavItem(R.drawable.ic_home_outline, R.drawable.ic_home_filled, "Home"),
+        BottomNavItem(R.drawable.ic_saved_outline, R.drawable.ic_saved_filled, "Saved"),
+        BottomNavItem(R.drawable.ic_booking_outline, R.drawable.ic_booking_filled, "Bookings"),
+        BottomNavItem(R.drawable.ic_profile_outline, R.drawable.ic_profile_filled, "Profile")
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -136,6 +152,8 @@ fun MainScreen(
     }
 }
 
+// Floating pill nav, styled after the XML custom_bottom_nav: lavender surface,
+// rounded-square selected item, outline icons that switch to filled when selected
 @Composable
 fun BottomNavBar(
     items: List<BottomNavItem>,
@@ -147,15 +165,17 @@ fun BottomNavBar(
         modifier = modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 16.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .shadow(8.dp, shape = CircleShape)
+                .shadow(8.dp, shape = CircleShape, spotColor = PurpleDark)
                 .clip(CircleShape)
-                .background(Color.White),
+                .background(NavSurface)
+                .selectableGroup()
+                .padding(horizontal = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -176,26 +196,54 @@ fun BottomNavItemView(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    Box(
+    val background by animateColorAsState(
+        targetValue = if (isSelected) Purple else Color.Transparent,
+        animationSpec = tween(200),
+        label = "nav_item_bg"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1f else 0.92f,
+        animationSpec = spring(dampingRatio = 0.5f, stiffness = Spring.StiffnessMedium),
+        label = "nav_item_scale"
+    )
+
+    Row(
         modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .then(
-                if (isSelected) Modifier.background(Purple)
-                else Modifier
-            )
-            .clickable(
+            .height(48.dp)
+            .defaultMinSize(minWidth = 48.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(14.dp))
+            .background(background)
+            .selectable(
+                selected = isSelected,
+                onClick = onClick,
+                role = Role.Tab,
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
+                indication = null
+            )
+            .padding(horizontal = 12.dp)
+            .animateContentSize(animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = item.icon,
-            contentDescription = item.label,
+            painter = painterResource(if (isSelected) item.selectedIcon else item.icon),
+            contentDescription = if (isSelected) null else item.label,
             tint = if (isSelected) Color.White else NavInactive,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
         )
+        if (isSelected) {
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = item.label,
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+        }
     }
 }

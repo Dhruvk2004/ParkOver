@@ -63,6 +63,7 @@ import com.example.parkover.viewmodels.AuthViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.example.parkover.ui.theme.ButtonBorder
 
 @Composable
 fun SignUpScreen(
@@ -295,7 +296,7 @@ fun SignUpScreen(
                 .fillMaxWidth()
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
-            border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+            border = BorderStroke(1.dp, ButtonBorder)
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.google),
