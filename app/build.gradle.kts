@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +8,15 @@ plugins {
     alias(libs.plugins.compose.compiler)
     id("kotlin-parcelize")
 }
+
+// Secrets live in the git-ignored local.properties (e.g. MAPS_API_KEY=...)
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")
+    ?: System.getenv("MAPS_API_KEY")
+    ?: ""
 
 android {
     namespace = "com.example.parkover"
@@ -19,6 +30,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Exposed as R.string.google_maps_key (used by the manifest meta-data and Places)
+        resValue("string", "google_maps_key", mapsApiKey)
     }
 
     buildTypes {
@@ -39,6 +53,7 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
 }
 
