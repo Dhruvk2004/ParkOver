@@ -125,9 +125,9 @@ fun SelectFloorScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            LegendItem(color = SuccessGreen, label = "Available")
-            LegendItem(color = ErrorRed, label = "Occupied")
-            LegendItem(color = Purple, label = "Selected")
+            LegendItem(color = Color.White, borderColor = Purple.copy(alpha = 0.4f), label = "Available")
+            LegendItem(color = Color(0xFFF5F5F5), borderColor = Color.Transparent, label = "Occupied")
+            LegendItem(color = Purple, borderColor = Purple, label = "Selected")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -170,7 +170,8 @@ fun SelectFloorScreen(
             onClick = onContinue,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Purple),
@@ -190,47 +191,61 @@ private fun ParkingSpotCell(
 ) {
     val bgColor = when {
         isSelected -> Purple
-        spot.isAvailable -> SuccessGreen.copy(alpha = 0.15f)
-        else -> ErrorRed.copy(alpha = 0.15f)
+        spot.isAvailable -> Color.White
+        else -> Color(0xFFF5F5F5)
     }
     val borderColor = when {
         isSelected -> Purple
-        spot.isAvailable -> SuccessGreen
-        else -> ErrorRed
+        spot.isAvailable -> Purple.copy(alpha = 0.4f)
+        else -> Color.Transparent
     }
     val textColor = when {
         isSelected -> Color.White
         spot.isAvailable -> TextPrimary
-        else -> ErrorRed
+        else -> Color(0xFFBDBDBD)
     }
 
     Box(
         modifier = modifier
-            .height(56.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .height(60.dp)
+            .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
+            .border(
+                width = if (isSelected) 2.dp else 1.dp,
+                color = borderColor,
+                shape = RoundedCornerShape(12.dp)
+            )
             .clickable(enabled = spot.isAvailable, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = spot.spotNumber,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = textColor,
-            textAlign = TextAlign.Center
-        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = spot.spotNumber,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor,
+                textAlign = TextAlign.Center
+            )
+            if (!spot.isAvailable) {
+                Text(
+                    text = "Occupied",
+                    fontSize = 9.sp,
+                    color = Color(0xFFBDBDBD)
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun LegendItem(color: Color, label: String) {
+private fun LegendItem(color: Color, borderColor: Color = Color.Transparent, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(12.dp)
-                .clip(RoundedCornerShape(3.dp))
+                .size(14.dp)
+                .clip(RoundedCornerShape(4.dp))
                 .background(color)
+                .border(1.dp, borderColor, RoundedCornerShape(4.dp))
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(text = label, fontSize = 12.sp, color = TextSecondary)

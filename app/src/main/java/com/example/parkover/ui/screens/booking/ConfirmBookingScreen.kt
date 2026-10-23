@@ -1,7 +1,11 @@
 package com.example.parkover.ui.screens.booking
 
 import android.app.TimePickerDialog
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,9 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -19,11 +27,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -35,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -57,7 +63,6 @@ fun ConfirmBookingScreen(
     val context = LocalContext.current
     val timeFormat = remember { SimpleDateFormat("hh:mm a", Locale.getDefault()) }
 
-    // Default check-in: next hour
     val defaultCheckIn = remember {
         Calendar.getInstance().apply {
             add(Calendar.HOUR_OF_DAY, 1)
@@ -71,7 +76,7 @@ fun ConfirmBookingScreen(
     var evCharging by remember { mutableStateOf(false) }
 
     val checkOutTime = checkInTime + (duration.toLong() * 3600000L)
-    val pricePerHour = 50.0 // Will come from booking data
+    val pricePerHour = 50.0
     val basePrice = pricePerHour * duration.toInt()
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -92,7 +97,12 @@ fun ConfirmBookingScreen(
             // Check-in time
             Text("Check-in Time", fontSize = 14.sp, color = TextSecondary)
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
+
+            // Modern time selector card
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 onClick = {
                     val cal = Calendar.getInstance().apply { timeInMillis = checkInTime }
                     TimePickerDialog(
@@ -111,27 +121,62 @@ fun ConfirmBookingScreen(
                         false
                     ).show()
                 },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = timeFormat.format(Date(checkInTime)),
-                    fontSize = 16.sp,
-                    color = TextPrimary
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Tap to change", fontSize = 12.sp, color = TextSecondary)
+                        Text(
+                            text = timeFormat.format(Date(checkInTime)),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Purple
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Purple.copy(alpha = 0.1f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🕐", fontSize = 20.sp)
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Check-out time (calculated)
-            Text("Check-out Time", fontSize = 14.sp, color = TextSecondary)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = timeFormat.format(Date(checkOutTime)),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = TextPrimary
-            )
+            // Check-out time card
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Check-out Time", fontSize = 12.sp, color = TextSecondary)
+                        Text(
+                            text = timeFormat.format(Date(checkOutTime)),
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Text("Auto-calculated", fontSize = 11.sp, color = TextSecondary)
+                }
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -177,33 +222,19 @@ fun ConfirmBookingScreen(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Wheelchair Access", fontSize = 14.sp, color = TextPrimary)
-                        Switch(
-                            checked = wheelchairAccess,
-                            onCheckedChange = { wheelchairAccess = it },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Purple)
-                        )
-                    }
+                    ToggleRow(
+                        label = "Wheelchair Access",
+                        checked = wheelchairAccess,
+                        onCheckedChange = { wheelchairAccess = it }
+                    )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("EV Charging", fontSize = 14.sp, color = TextPrimary)
-                        Switch(
-                            checked = evCharging,
-                            onCheckedChange = { evCharging = it },
-                            colors = SwitchDefaults.colors(checkedTrackColor = Purple)
-                        )
-                    }
+                    ToggleRow(
+                        label = "EV Charging",
+                        checked = evCharging,
+                        onCheckedChange = { evCharging = it }
+                    )
                 }
             }
         }
@@ -212,12 +243,62 @@ fun ConfirmBookingScreen(
             onClick = onContinue,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Purple)
         ) {
             Text("Continue", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 14.sp, color = TextPrimary)
+
+        // Custom toggle
+        Box(
+            modifier = Modifier
+                .width(52.dp)
+                .height(28.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (checked) Purple else Color(0xFFE0E0E0))
+                .border(
+                    width = 1.5.dp,
+                    color = if (checked) Purple else Color(0xFFBDBDBD),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .clickable { onCheckedChange(!checked) }
+                .padding(3.dp),
+            contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+                contentAlignment = Alignment.Center
+            ) {
+                if (checked) {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = null,
+                        tint = Purple,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }

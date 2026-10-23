@@ -28,4 +28,6 @@ sealed class Screen(val route: String) {
 
     // Profile sub-screens
     object SavedVehicles : Screen("saved_vehicles")
+    object PaymentMethods : Screen("payment_methods")
+    object HelpSupport : Screen("help_support")
 }

@@ -4,7 +4,7 @@
     
     <!-- Google Maps API Key -->
     <string name="google_maps_key">AIzaSyBdTlleA6NyQta9251BQcAySgZcVqwIABw</string>
-    
+
     <!-- Navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_saved">Saved</string>

@@ -119,7 +119,8 @@ fun SelectVehicleScreen(
                 onClick = onContinue,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 24.dp)
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Purple),

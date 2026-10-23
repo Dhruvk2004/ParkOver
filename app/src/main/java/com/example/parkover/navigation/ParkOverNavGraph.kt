@@ -220,6 +220,18 @@ fun ParkOverNavGraph(
                 onBack = { navController.navigateUp() }
             )
         }
+
+        composable(Screen.PaymentMethods.route) {
+            com.example.parkover.ui.screens.profile.PaymentMethodsScreen(
+                onBack = { navController.navigateUp() }
+            )
+        }
+
+        composable(Screen.HelpSupport.route) {
+            com.example.parkover.ui.screens.profile.HelpSupportScreen(
+                onBack = { navController.navigateUp() }
+            )
+        }
     }
 }
 

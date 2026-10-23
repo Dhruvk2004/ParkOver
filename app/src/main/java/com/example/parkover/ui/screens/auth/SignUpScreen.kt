@@ -104,7 +104,8 @@ fun SignUpScreen(
         when (authState) {
             is AuthState.Success -> onSignUpSuccess()
             is AuthState.Error -> {
-                errorMessage = (authState as AuthState.Error).message
+                val rawMessage = (authState as AuthState.Error).message
+                errorMessage = mapSignUpAuthError(rawMessage)
             }
             else -> {}
         }
@@ -324,5 +325,22 @@ fun SignUpScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun mapSignUpAuthError(rawMessage: String): String {
+    val lower = rawMessage.lowercase()
+    return when {
+        "email already" in lower || "already in use" in lower ->
+            "An account with this email already exists"
+        "weak password" in lower ->
+            "Password is too weak. Use at least 6 characters"
+        "invalid email" in lower || "badly formatted" in lower ->
+            "Please enter a valid email address"
+        "network" in lower || "timeout" in lower ->
+            "Network error. Please check your connection"
+        "too many" in lower || "blocked" in lower ->
+            "Too many attempts. Please try again later"
+        else -> "Something went wrong. Please try again"
     }
 }

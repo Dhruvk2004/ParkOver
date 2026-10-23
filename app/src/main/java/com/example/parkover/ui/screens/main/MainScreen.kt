@@ -1,16 +1,16 @@
 package com.example.parkover.ui.screens.main
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +61,7 @@ fun MainScreen(
     initialTab: Int = 0
 ) {
     var selectedTab by remember { mutableIntStateOf(initialTab) }
+    var previousTab by remember { mutableIntStateOf(initialTab) }
 
     val navItems = listOf(
         BottomNavItem(Icons.Default.Home, "Home"),
@@ -71,39 +71,66 @@ fun MainScreen(
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Content
-        when (selectedTab) {
-            0 -> HomeScreen(
-                parkingViewModel = parkingViewModel,
-                onParkingSpotClick = { spotId ->
-                    navController.navigate(Screen.ParkingDetails.createRoute(spotId))
-                },
-                onProfileClick = { selectedTab = 3 }
-            )
-            1 -> SavedScreen(
-                onParkingClick = { spotId ->
-                    navController.navigate(Screen.ParkingDetails.createRoute(spotId))
-                }
-            )
-            2 -> BookingListScreen()
-            3 -> ProfileScreen(
-                authViewModel = authViewModel,
-                onLogout = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(0) { inclusive = true }
+        // Content with animated transitions
+        AnimatedContent(
+            targetState = selectedTab,
+            transitionSpec = {
+                val direction = if (targetState > previousTab) 1 else -1
+                (slideInHorizontally { width -> direction * width / 4 } + fadeIn(
+                    animationSpec = androidx.compose.animation.core.tween(250)
+                )).togetherWith(
+                    slideOutHorizontally { width -> -direction * width / 4 } + fadeOut(
+                        animationSpec = androidx.compose.animation.core.tween(200)
+                    )
+                )
+            },
+            label = "tab_content"
+        ) { tab ->
+            when (tab) {
+                0 -> HomeScreen(
+                    parkingViewModel = parkingViewModel,
+                    onParkingSpotClick = { spotId ->
+                        navController.navigate(Screen.ParkingDetails.createRoute(spotId))
+                    },
+                    onProfileClick = {
+                        previousTab = selectedTab
+                        selectedTab = 3
                     }
-                },
-                onSavedVehicles = {
-                    navController.navigate(Screen.SavedVehicles.route)
-                }
-            )
+                )
+                1 -> SavedScreen(
+                    onParkingClick = { spotId ->
+                        navController.navigate(Screen.ParkingDetails.createRoute(spotId))
+                    }
+                )
+                2 -> BookingListScreen()
+                3 -> ProfileScreen(
+                    authViewModel = authViewModel,
+                    onLogout = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    },
+                    onSavedVehicles = {
+                        navController.navigate(Screen.SavedVehicles.route)
+                    },
+                    onPaymentMethods = {
+                        navController.navigate(Screen.PaymentMethods.route)
+                    },
+                    onHelpSupport = {
+                        navController.navigate(Screen.HelpSupport.route)
+                    }
+                )
+            }
         }
 
         // Bottom Navigation Bar
         BottomNavBar(
             items = navItems,
             selectedIndex = selectedTab,
-            onItemSelected = { selectedTab = it },
+            onItemSelected = {
+                previousTab = selectedTab
+                selectedTab = it
+            },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
     }

@@ -43,19 +43,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.parkover.data.model.Booking
-import com.example.parkover.data.model.BookingStatus
 import com.example.parkover.data.model.PaymentMethod
-import com.example.parkover.data.model.PaymentStatus
-import com.example.parkover.data.model.VehicleType
-import com.example.parkover.data.repository.BookingRepository
 import com.example.parkover.ui.theme.Purple
 import com.example.parkover.ui.theme.TextPrimary
 import com.example.parkover.ui.theme.TextSecondary
-import com.google.firebase.Timestamp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +57,6 @@ fun PaymentScreen(
     onPaymentSuccess: (String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val repository = remember { BookingRepository() }
 
     var selectedMethod by remember { mutableStateOf(PaymentMethod.UPI) }
     var isProcessing by remember { mutableStateOf(false) }
@@ -152,40 +144,16 @@ fun PaymentScreen(
             onClick = {
                 isProcessing = true
                 scope.launch {
-                    delay(1500) // Simulate payment
-                    // Create booking
-                    val booking = Booking(
-                        parkingId = "",
-                        parkingName = "Parking Spot",
-                        parkingAddress = "Address",
-                        vehicleId = "",
-                        vehicleNumber = "XX00XX0000",
-                        vehicleType = VehicleType.FOUR_WHEELER,
-                        floorNumber = 1,
-                        floorName = "1st Floor",
-                        spotNumber = "A01",
-                        entryTime = Timestamp(Date(System.currentTimeMillis() + 3600000)),
-                        exitTime = Timestamp(Date(System.currentTimeMillis() + 18000000)),
-                        durationHours = 4,
-                        basePrice = 200.0,
-                        taxAmount = 20.0,
-                        totalPrice = totalAmount,
-                        paymentMethod = selectedMethod,
-                        paymentStatus = if (selectedMethod == PaymentMethod.CASH) PaymentStatus.PENDING else PaymentStatus.COMPLETED,
-                        bookingStatus = BookingStatus.CONFIRMED,
-                        qrCodeData = "PARKOVER-${System.currentTimeMillis()}"
-                    )
-                    val result = repository.createBooking(booking)
-                    result.onSuccess { savedBooking ->
-                        onPaymentSuccess(savedBooking.id)
-                    }.onFailure {
-                        isProcessing = false
-                    }
+                    delay(1500) // Simulate payment processing
+                    // Generate a booking ID and navigate to success
+                    val bookingId = "PK${System.currentTimeMillis().toString().takeLast(6)}"
+                    onPaymentSuccess(bookingId)
                 }
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
                 .height(56.dp),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Purple),

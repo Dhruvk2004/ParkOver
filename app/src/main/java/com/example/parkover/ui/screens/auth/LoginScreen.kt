@@ -103,7 +103,8 @@ fun LoginScreen(
         when (authState) {
             is AuthState.Success -> onLoginSuccess()
             is AuthState.Error -> {
-                errorMessage = (authState as AuthState.Error).message
+                val rawMessage = (authState as AuthState.Error).message
+                errorMessage = mapAuthError(rawMessage)
             }
             else -> {}
         }
@@ -304,5 +305,24 @@ fun LoginScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun mapAuthError(rawMessage: String): String {
+    val lower = rawMessage.lowercase()
+    return when {
+        "credential" in lower || "password" in lower || "invalid" in lower ->
+            "The email or password is incorrect"
+        "no user" in lower || "user not found" in lower ->
+            "No account found with this email"
+        "too many" in lower || "blocked" in lower ->
+            "Too many attempts. Please try again later"
+        "network" in lower || "timeout" in lower ->
+            "Network error. Please check your connection"
+        "disabled" in lower ->
+            "This account has been disabled"
+        "email already" in lower || "already in use" in lower ->
+            "An account with this email already exists"
+        else -> "Something went wrong. Please try again"
     }
 }
