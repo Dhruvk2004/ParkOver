@@ -19,3 +19,6 @@ local.properties
 
 # API folder (separate repo)
 /api/
+
+# Kotlin compiler daemon logs
+.kotlin/

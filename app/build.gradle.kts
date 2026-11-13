@@ -9,21 +9,27 @@ plugins {
     id("kotlin-parcelize")
 }
 
-// Secrets live in the git-ignored local.properties (e.g. MAPS_API_KEY=...)
+// Secrets live in the git-ignored local.properties (e.g. ORS_API_KEY=...)
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) file.inputStream().use { load(it) }
 }
-val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")
-    ?: System.getenv("MAPS_API_KEY")
+// Free OpenRouteService key for road distance, drive time and route lines.
+val orsApiKey: String = localProperties.getProperty("ORS_API_KEY")
+    ?: System.getenv("ORS_API_KEY")
     ?: ""
 
+// Optional dev-login account for debug builds (DEV_LOGIN_EMAIL / DEV_LOGIN_PASSWORD).
+// Never compiled into release builds.
+val devLoginEmail: String = localProperties.getProperty("DEV_LOGIN_EMAIL") ?: ""
+val devLoginPassword: String = localProperties.getProperty("DEV_LOGIN_PASSWORD") ?: ""
+
 android {
-    namespace = "com.example.parkover"
+    namespace = "com.dhruvk.parkover"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.parkover"
+        applicationId = "com.dhruvk.parkover"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -31,12 +37,17 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Exposed as R.string.google_maps_key (used by the manifest meta-data and Places)
-        resValue("string", "google_maps_key", mapsApiKey)
+        buildConfigField("String", "ORS_API_KEY", "\"$orsApiKey\"")
     }
 
     buildTypes {
+        debug {
+            buildConfigField("String", "DEV_LOGIN_EMAIL", "\"$devLoginEmail\"")
+            buildConfigField("String", "DEV_LOGIN_PASSWORD", "\"$devLoginPassword\"")
+        }
         release {
+            buildConfigField("String", "DEV_LOGIN_EMAIL", "\"\"")
+            buildConfigField("String", "DEV_LOGIN_PASSWORD", "\"\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -53,7 +64,7 @@ android {
     }
     buildFeatures {
         compose = true
-        resValues = true
+        buildConfig = true
     }
 }
 
@@ -83,8 +94,8 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.compose)
     debugImplementation(libs.compose.ui.tooling)
 
-    // Maps Compose
-    implementation(libs.maps.compose)
+    // Maps: MapLibre with OpenFreeMap tiles (no Google billing needed)
+    implementation(libs.maplibre.android)
 
     // Firebase
     implementation(platform(libs.firebase.bom))
@@ -95,10 +106,6 @@ dependencies {
     // Location Services
     implementation(libs.play.services.location)
     implementation(libs.play.services.auth)
-
-    // Google Maps & Places
-    implementation(libs.play.services.maps)
-    implementation(libs.places)
 
     // Room Database
     implementation(libs.room.runtime)

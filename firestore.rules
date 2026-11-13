@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// ParkOver Firestore rules. Paste into Firebase console → Firestore → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+
+    // Profile, saved parkings and UPI IDs: only the owner.
+    match /users/{uid} {
+      allow read, write: if isUser(uid);
+      match /{sub=**} {
+        allow read, write: if isUser(uid);
+      }
+    }
+
+    // Vehicles are top-level documents tagged with userId.
+    match /vehicles/{vehicleId} {
+      allow read, update, delete: if isUser(resource.data.userId);
+      allow create: if isUser(request.resource.data.userId);
+    }
+
+    // Bookings: only the owner can create or change one.
+    // Reads are open to any signed-in user because the booking flow checks which bays are
+    // taken by querying other users' bookings. Tighten before launch (see the later plan).
+    match /bookings/{bookingId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.userId);
+      allow update: if isUser(resource.data.userId)
+                    && request.resource.data.userId == resource.data.userId;
+      allow delete: if false;
+    }
+
+    // Live free-spot counts. Public: the app listens before sign-in, and counts aren't private.
+    // The app seeds these and adjusts them inside booking transactions.
+    match /parking_availability/{parkingId} {
+      allow read: if true;
+      allow write: if signedIn();
+    }
+
+    // Support requests: users can file one, nobody can read them back from the app.
+    match /support_tickets/{ticketId} {
+      allow create: if isUser(request.resource.data.userId);
+      allow read, update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,197 @@
+<title>ParkOver Later Plan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; a decisions log on top, then a phased checklist (Now → Before launch → Later). */
+:root {
+  --bg: #F7F6FB;
+  --surface: #FFFFFF;
+  --ink: #1B1830;
+  --muted: #5F5B76;
+  --line: #E4E1EF;
+  --brand: #613EEA;
+  --brand-soft: #EEEAFE;
+  --done: #1F8A5B;
+  --done-soft: #E3F4EC;
+  --warn: #B4610E;
+  --warn-soft: #FDF0E1;
+  --risk: #C23A3A;
+  --risk-soft: #FBE7E7;
+  --display: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --body: "Jost", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12101C; --surface: #1B1828; --ink: #ECEAF6; --muted: #A29DBB; --line: #2C283F;
+  --brand: #9B85FF; --brand-soft: #2A2348; --done: #5CCB98; --done-soft: #183427;
+  --warn: #F0A85A; --warn-soft: #3A2A17; --risk: #F08A8A; --risk-soft: #3D1E22; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12101C; --surface: #1B1828; --ink: #ECEAF6; --muted: #A29DBB; --line: #2C283F;
+  --brand: #9B85FF; --brand-soft: #2A2348; --done: #5CCB98; --done-soft: #183427;
+  --warn: #F0A85A; --warn-soft: #3A2A17; --risk: #F08A8A; --risk-soft: #3D1E22; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 40px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 40px; }
+header { display: flex; flex-direction: column; gap: 10px; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); font-weight: 600; }
+h1 { font-family: var(--display); font-size: 36px; line-height: 1.1; margin: 0; font-weight: 600; text-wrap: balance; }
+.lede { color: var(--muted); margin: 0; max-width: 62ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.meta span { border: 1px solid var(--line); border-radius: 6px; padding: 2px 8px; background: var(--surface); }
+
+section { display: flex; flex-direction: column; gap: 14px; }
+h2 { font-family: var(--display); font-size: 22px; margin: 0; font-weight: 600; display: flex; align-items: baseline; gap: 10px; }
+h2 small { font-size: 13px; color: var(--muted); font-weight: 400; }
+.note { color: var(--muted); margin: 0; font-size: 15px; }
+
+.decision { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
+.decision .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.decision h3 { margin: 0; font-size: 18px; font-weight: 600; }
+.date { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.decision p { margin: 0; max-width: 65ch; }
+.decision dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 15px; }
+.decision dt { color: var(--muted); }
+.decision dd { margin: 0; min-width: 0; }
+
+.list { list-style: none; margin: 0; padding: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.list li { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; padding: 14px 18px; border-top: 1px solid var(--line); }
+.list li:first-child { border-top: 0; }
+.list .pill { grid-row: span 2; align-self: start; margin-top: 2px; }
+.list b { font-weight: 600; }
+.list p { margin: 0; color: var(--muted); font-size: 15px; min-width: 0; }
+
+.pill { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.todo { background: var(--brand-soft); color: var(--brand); }
+.pill.done { background: var(--done-soft); color: var(--done); }
+.pill.soon { background: var(--warn-soft); color: var(--warn); }
+.pill.risk { background: var(--risk-soft); color: var(--risk); }
+
+code { font-family: var(--mono); font-size: .88em; background: var(--brand-soft); color: var(--ink); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+footer { color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (max-width: 480px) { h1 { font-size: 28px; } .decision dl { grid-template-columns: 1fr; } .decision dt { margin-top: 4px; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">ParkOver · Android</div>
+    <h1>ParkOver later plan</h1>
+    <p class="lede">The running list of small decisions and the work still ahead for ParkOver. New decisions get added to the log at the top; tasks move from one phase to the next as they get done.</p>
+    <div class="meta"><span>branch compose-revamp</span><span>updated 3 Nov 2026</span><span>Firebase parkover-b042b</span></div>
+  </header>
+
+  <section>
+    <h2>Decisions <small>newest first</small></h2>
+
+    <article class="decision">
+      <div class="top"><h3>Proposed: free map stack instead of Google Maps</h3><span class="date">3 Nov 2026</span></div>
+      <p>No Google billing account, so the map moves to MapLibre with OpenFreeMap vector tiles and a ParkOver style. Checked with a real render around Chembur: the restyled map looks clean and on-brand, not like default OpenStreetMap.</p>
+      <dl>
+        <dt>Map</dt><dd>MapLibre (official <code>maplibre-compose</code> library for Compose) + OpenFreeMap tiles: no key, no billing, no request limit on the public server, but no uptime guarantee.</dd>
+        <dt>Distance</dt><dd>Show road distance, not straight line. Measured: Chembur → Phoenix Marketcity is 4.83 km straight but 9.68 km by road (11 min, no traffic). Use OpenRouteService (free: 2,000 routes and 500 matrix calls a day) for road distance, ETA and the route line.</dd>
+        <dt>Search</dt><dd>Photon public API (fair use, throttled if heavy) plus searching our own parking list.</dd>
+        <dt>Navigation</dt><dd>Directions button hands off to the Google Maps app, which does voice turn-by-turn and live traffic for free.</dd>
+        <dt>Lose</dt><dd>Live traffic inside our app and Google's shop and building details.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Parking data needs real sources (next phase)</h3><span class="date">3 Nov 2026</span></div>
+      <p>The current parking list is a hand-made JSON file. Checked the free options for Mumbai:</p>
+      <dl>
+        <dt>OpenStreetMap</dt><dd>430 parking places in Mumbai, but only 11% have a name, 4% a capacity, 14% fee info and almost none opening hours. Good for locations only.</dd>
+        <dt>BMC open data</dt><dd>MCGM publishes an off-street parking dataset (public lots, BEST depots) as free CSVs. Official, but small and possibly out of date.</dd>
+        <dt>Real apps</dt><dd>SpotHero-style apps get most of their inventory and live availability through direct partnerships with garage and lot operators, not from maps.</dd>
+        <dt>Plan</dt><dd>Seed from BMC data + named OSM parkings, verify, store in Firestore; later add operators and an admin screen for live counts.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Firebase moves to a new project on the personal account</h3><span class="date">3 Nov 2026</span></div>
+      <p>The old project <code>parkover-8c764</code> was created on the company account. It's replaced by a fresh project, <code>parkover-b042b</code>, on the personal account. Nothing is migrated: every user, booking and record in the old project was test data.</p>
+      <dl>
+        <dt>Why</dt><dd>A company-owned project can be taken away or fall under company policy and billing. A personal app should live on a personal account.</dd>
+        <dt>Region</dt><dd>Create Firestore in <code>asia-south1</code> (Mumbai). It can't be changed later.</dd>
+        <dt>Cleanup</dt><dd>Delete <code>parkover-8c764</code> from the company account once the new project works.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Package name is com.dhruvk.parkover</h3><span class="date">3 Nov 2026</span></div>
+      <p>Renamed from <code>com.example.parkover</code>, which the Play Store rejects. This is the ID registered in Firebase and on the Play Store, and it can never change after publishing.</p>
+      <dl>
+        <dt>Debug SHA-1</dt><dd><code>30:05:CB:7C:54:AA:BD:03:49:90:6F:E4:18:1A:15:7A:51:46:00:0B</code></dd>
+        <dt>Later</dt><dd>Add the release key and Play App Signing fingerprints to Firebase before launch.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Dev login uses a real test account, not Anonymous sign-in</h3><span class="date">3 Nov 2026</span></div>
+      <p>The debug-only Dev login button signs in with a test user whose email and password live in <code>local.properties</code>. Anonymous sign-in stays off in Firebase.</p>
+      <dl>
+        <dt>Why</dt><dd>The Firebase API key ships inside the APK. With Anonymous on, anyone could create signed-in users from a script and reach any data whose rules only check <code>request.auth != null</code>.</dd>
+        <dt>How</dt><dd>Add a user in Firebase → Authentication → Users, then set <code>DEV_LOGIN_EMAIL</code> and <code>DEV_LOGIN_PASSWORD</code> in <code>local.properties</code> and rebuild.</dd>
+        <dt>Release</dt><dd>The button is hidden when <code>BuildConfig.DEBUG</code> is false, and release builds get empty credential fields.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Personal repo pushes go through github-personal</h3><span class="date">Oct 2026</span></div>
+      <p>ParkOver commits and pushes use the <code>github-personal</code> SSH alias (Dhruvk2004), never the work key.</p>
+      <dl>
+        <dt>How</dt><dd>The repo sets <code>core.sshCommand "ssh -o IdentitiesOnly=yes"</code> so the work key isn't offered first.</dd>
+      </dl>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>Secrets stay in local.properties</h3><span class="date">Oct 2026</span></div>
+      <p>The Maps key (<code>MAPS_API_KEY</code>) and dev login credentials are read from the git-ignored <code>local.properties</code> at build time. Nothing secret goes in <code>strings.xml</code> or the repo.</p>
+    </article>
+
+    <article class="decision">
+      <div class="top"><h3>No in-app payments until a gateway is added</h3><span class="date">Oct 2026</span></div>
+      <p>Bookings are confirmed in the app and paid at the parking. Card and net-banking show as "Soon", and the app never collects raw card numbers.</p>
+    </article>
+  </section>
+
+  <section>
+    <h2>Now</h2>
+    <ul class="list">
+      <li><span class="pill todo">To do</span><b>Set up parkover-b042b</b><p>Register Android app <code>com.dhruvk.parkover</code> with the debug SHA-1, turn on Email/Password and Google sign-in, create Firestore in asia-south1, then replace <code>app/google-services.json</code>. The app won't build until the new file is in.</p></li>
+      <li><span class="pill todo">To do</span><b>New Maps key in the personal project</b><p>To discuss after the first run. Enable Maps SDK for Android, Places and Directions, and restrict the key to the app's package and SHA-1. Then use the Geocoding API with <code>language=en</code> for the Home header: the phone's own geocoder returns area names like Chembur in Devanagari, so the header shows the road name for now.</p></li>
+      <li><span class="pill todo">To do</span><b>Publish Firestore rules</b><p>Paste <code>firestore.rules</code> from the repo into Firebase → Firestore → Rules. Until then every read is denied.</p></li>
+      <li><span class="pill done">Done</span><b>Rename package to com.dhruvk.parkover</b><p><code>applicationId</code>, <code>namespace</code> and all Kotlin packages moved.</p></li>
+      <li><span class="pill todo">To do</span><b>Create the dev test user</b><p>Firebase → Authentication → Users → Add user. Put its email and password in <code>local.properties</code> and rebuild.</p></li>
+      <li><span class="pill todo">To do</span><b>Test the signed-in screens on the Nothing phone</b><p>Home map, booking flow end to end, Saved, Bookings (cancel and extend), Profile, vehicles, payment methods, help. Only Start and Login are checked so far.</p></li>
+      <li><span class="pill todo">To do</span><b>Commit the Compose revamp</b><p>All phases are on <code>compose-revamp</code>, uncommitted. Push only through github-personal.</p></li>
+      <li><span class="pill done">Done</span><b>Status bar and Login logo fixes</b><p>White status icons on the Start screen; full logo on a purple tile on Login. Checked on the phone.</p></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Before launch</h2>
+    <ul class="list">
+      <li><span class="pill todo">To do</span><b>Move Dev login into the debug source set</b><p>Put the real button in <code>app/src/debug/</code> and an empty stub in <code>app/src/release/</code>, so the release APK doesn't contain the code at all.</p></li>
+      <li><span class="pill todo">To do</span><b>Turn on Firebase App Check</b><p>Use Play Integrity so only the genuine app from the Play Store can reach Firebase.</p></li>
+      <li><span class="pill risk">Security</span><b>Stop sharing other users' bookings</b><p>The current rules (<code>firestore.rules</code>) let any signed-in user read all bookings, because the floor screen finds taken bays by querying everyone's bookings. Move taken bays into a per-parking occupancy document (or a Cloud Function) and then limit booking reads to the owner.</p></li>
+      <li><span class="pill risk">Security</span><b>Retire the old Maps key and project</b><p>The old key is public in commit 57364c6 and belongs to the company project. Deleting <code>parkover-8c764</code> retires it; make sure the new key is restricted.</p></li>
+      <li><span class="pill todo">To do</span><b>Play Console reviewer account</b><p>Give Google's reviewers a normal test login under App content → App access.</p></li>
+      <li><span class="pill todo">To do</span><b>Clean up resources</b><p>Delete unused drawables, anims, menus, styles and dimens left from the XML UI, drop unused dependencies, and convert the roughly 1 MB car PNGs to WebP to shrink the 35 MB APK.</p></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Later</h2>
+    <ul class="list">
+      <li><span class="pill soon">Soon</span><b>Booking reminders</b><p>Needs push notifications (FCM) and a scheduled reminder before check-in.</p></li>
+      <li><span class="pill soon">Soon</span><b>Card and net-banking payments</b><p>Needs a payment gateway with its own tokenised card sheet; store only the last 4 digits.</p></li>
+      <li><span class="pill todo">Idea</span><b>Separate dev and prod Firebase projects</b><p>Debug builds use <code>parkover-dev</code>, release uses <code>parkover-prod</code>, each with its own <code>google-services.json</code>.</p></li>
+      <li><span class="pill todo">Idea</span><b>Firebase Emulator Suite for local testing</b><p>Run Auth and Firestore locally so test data never touches the cloud. Heavy on an 8 GB Mac, so later.</p></li>
+      <li><span class="pill todo">Idea</span><b>Add IdentitiesOnly to ~/.ssh/config</b><p>Set it on the github-personal host so every personal repo picks the right key, not only ParkOver.</p></li>
+    </ul>
+  </section>
+
+  <footer>Related: the Compose migration audit and the UI revamp before/after pages from October.</footer>
+</div>
