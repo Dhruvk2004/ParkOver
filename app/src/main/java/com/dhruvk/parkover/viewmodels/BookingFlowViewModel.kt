@@ -1,6 +1,7 @@
 package com.dhruvk.parkover.viewmodels
 
 import com.dhruvk.parkover.di.AppServices
+import com.dhruvk.parkover.domain.BookingRules
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.model.Booking
@@ -225,31 +226,18 @@ class BookingFlowViewModel : ViewModel() {
     private fun recalculate() {
         val spot = _spot.value
         _bookingData.update { data ->
-            val typeRate = when (data.vehicleType) {
-                VehicleType.TWO_WHEELER -> spot?.pricePerHourTwoWheeler
-                VehicleType.FOUR_WHEELER -> spot?.pricePerHourFourWheeler
-                VehicleType.HEAVY -> spot?.pricePerHourHeavy
-            } ?: 0.0
-            val rate = typeRate * data.floorMultiplier
-            val base = rate * data.durationHours
-            val tax = base * Constants.BOOKING_TAX_RATE
-            data.copy(pricePerHour = rate, basePrice = base, taxAmount = tax, totalPrice = base + tax)
+            val q = BookingRules.quote(
+                BookingRules.ratePerHour(spot, data.vehicleType, data.floorMultiplier),
+                data.durationHours,
+                Constants.BOOKING_TAX_RATE
+            )
+            data.copy(pricePerHour = q.ratePerHour, basePrice = q.base, taxAmount = q.tax, totalPrice = q.total)
         }
     }
 
     companion object {
         const val HOUR = 3_600_000L
 
-        fun nextHalfHour(from: Long = AppServices.clock.nowMillis()): Long =
-            Calendar.getInstance().apply {
-                timeInMillis = from
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                val minute = get(Calendar.MINUTE)
-                if (minute < 30) set(Calendar.MINUTE, 30) else {
-                    set(Calendar.MINUTE, 0)
-                    add(Calendar.HOUR_OF_DAY, 1)
-                }
-            }.timeInMillis
+        fun nextHalfHour(from: Long = AppServices.clock.nowMillis()): Long = BookingRules.nextHalfHour(from)
     }
 }

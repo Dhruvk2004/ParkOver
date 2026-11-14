@@ -141,7 +141,7 @@ fun AddVehicleSheet(
 
             ParkTextField(
                 value = number,
-                onValueChange = { number = it.uppercase().take(13); numberError = null },
+                onValueChange = { number = it.uppercase().take(16); numberError = null },
                 label = "Number plate",
                 placeholder = "MH 02 AB 1234",
                 error = numberError,

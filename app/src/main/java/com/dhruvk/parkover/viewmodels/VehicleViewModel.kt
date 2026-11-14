@@ -1,5 +1,6 @@
 package com.dhruvk.parkover.viewmodels
 
+import com.dhruvk.parkover.utils.normalizeVehicleNumber
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.model.DefaultVehicles
@@ -90,7 +91,7 @@ class VehicleViewModel : ViewModel() {
                 type = type,
                 brand = brand.trim(),
                 model = model.trim(),
-                number = number.replace(" ", "").uppercase(),
+                number = number.normalizeVehicleNumber(),
                 isDefault = makeDefault || _vehicles.value.isEmpty()
             )
             bookingRepository.addVehicle(vehicle).fold(

@@ -1,5 +1,7 @@
 package com.dhruvk.parkover.viewmodels
 
+import com.dhruvk.parkover.di.AppServices
+import com.dhruvk.parkover.domain.BookingRules
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.model.Booking
@@ -127,13 +129,10 @@ class AccountViewModel : ViewModel() {
 
     companion object {
         fun isUpcoming(booking: Booking): Boolean =
-            booking.bookingStatus in setOf(BookingStatus.CONFIRMED, BookingStatus.ACTIVE, BookingStatus.PENDING) &&
-                booking.exitTime.toDate().time > System.currentTimeMillis()
+            BookingRules.isUpcoming(booking, AppServices.clock.nowMillis())
 
-        fun isActiveNow(booking: Booking): Boolean {
-            val now = System.currentTimeMillis()
-            return isUpcoming(booking) && booking.entryTime.toDate().time <= now
-        }
+        fun isActiveNow(booking: Booking): Boolean =
+            BookingRules.isActiveNow(booking, AppServices.clock.nowMillis())
 
         val UPI_REGEX = Regex("^[a-zA-Z0-9.\\-_]{2,256}@[a-zA-Z]{2,64}$")
     }

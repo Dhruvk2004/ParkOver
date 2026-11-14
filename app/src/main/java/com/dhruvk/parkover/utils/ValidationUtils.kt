@@ -45,6 +45,7 @@ object ValidationUtils {
         }
     }
     
+    /** Plate check; see [isValidVehicleNumber] for the accepted formats. */
     fun validateVehicleNumber(number: String): ValidationResult {
         return when {
             number.isBlank() -> ValidationResult.Error("Vehicle number is required")

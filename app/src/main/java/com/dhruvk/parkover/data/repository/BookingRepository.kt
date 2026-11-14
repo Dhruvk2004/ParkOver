@@ -8,6 +8,7 @@ import com.dhruvk.parkover.data.model.ParkingSpot
 import com.dhruvk.parkover.data.model.Vehicle
 import com.dhruvk.parkover.data.model.VehicleType
 import com.dhruvk.parkover.di.AppServices
+import com.dhruvk.parkover.domain.BookingRules
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -146,9 +147,8 @@ class BookingRepository {
     suspend fun createBooking(booking: Booking): Result<Booking> {
         val userId = auth.currentUser?.uid ?: return Result.failure(Exception("You're signed out. Log in and try again."))
 
-        if (booking.exitTime.toDate().time < AppServices.clock.nowMillis()) {
-            return Result.failure(Exception("That time has already passed. Pick a later check-in."))
-        }
+        BookingRules.timeProblem(booking.entryTime.toDate().time, booking.exitTime.toDate().time, AppServices.clock.nowMillis())
+            ?.let { return Result.failure(Exception(it)) }
 
         val bookingId = newBookingId()
         val newBooking = booking.copy(
@@ -197,7 +197,7 @@ class BookingRepository {
             }.await()
             Result.success(newBooking)
         } catch (e: Exception) {
-            Result.failure(e.toBookingError())
+            Result.failure(BookingRules.errorFor(e))
         }
     }
 
@@ -301,7 +301,7 @@ class BookingRepository {
                 }
             }.await()
         } catch (e: Exception) {
-            throw e.toBookingError()
+            throw BookingRules.errorFor(e)
         }
         updated
     }
@@ -324,24 +324,6 @@ class BookingRepository {
 
     class SlotTakenException(spotNumber: String) :
         Exception("Spot $spotNumber was just booked for that time. Pick another spot.")
-
-    /** Turns raw Firestore failures into messages a driver can act on. Never reports success. */
-    private fun Exception.toBookingError(): Exception {
-        val chain = generateSequence<Throwable>(this) { it.cause }.toList()
-        chain.firstOrNull { it is SlotTakenException }?.let { return it as Exception }
-        return when (chain.filterIsInstance<FirebaseFirestoreException>().firstOrNull()?.code) {
-            FirebaseFirestoreException.Code.UNAVAILABLE, FirebaseFirestoreException.Code.DEADLINE_EXCEEDED ->
-                Exception("You're offline, so nothing was booked. Check your connection and try again.")
-            FirebaseFirestoreException.Code.PERMISSION_DENIED ->
-                Exception("This booking was refused. Refresh and try again.")
-            FirebaseFirestoreException.Code.ABORTED ->
-                Exception("Someone booked at the same moment. Pick the spot again.")
-            else -> Exception(
-                chain.firstOrNull { it !is FirebaseFirestoreException && !it.message.isNullOrBlank() }?.message
-                    ?: "Couldn't complete the booking. Try again."
-            )
-        }
-    }
 
     companion object {
         const val SLOT_LOCKS = "slot_locks"

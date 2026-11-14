@@ -93,6 +93,7 @@ import com.dhruvk.parkover.data.model.SearchResult
 import com.dhruvk.parkover.data.repository.ApiResult
 import com.dhruvk.parkover.data.repository.RouteInfo
 import com.dhruvk.parkover.di.AppServices
+import com.dhruvk.parkover.domain.SpotFilters
 import com.dhruvk.parkover.data.repository.formatDriveTime
 import com.dhruvk.parkover.data.repository.formatRoadDistance
 import com.dhruvk.parkover.ui.components.AvailabilityBar
@@ -189,15 +190,7 @@ fun HomeScreen(
     val allSpots = (spotsResult as? ApiResult.Success)?.data.orEmpty()
     val centre = destination?.second ?: userLocation.latLng
     val visibleSpots = remember(allSpots, filters, centre) {
-        allSpots.filter { spot ->
-            spot.isActive &&
-                (SpotFilter.NEARBY !in filters ||
-                    LocationHelper.calculateDistance(centre.latitude, centre.longitude, spot.latitude, spot.longitude) <= NEARBY_RADIUS_KM) &&
-                (SpotFilter.UNDER_50 !in filters || spot.pricePerHourFourWheeler <= 50.0) &&
-                (SpotFilter.EV !in filters || spot.amenities.contains("EV Charging")) &&
-                (SpotFilter.COVERED !in filters || spot.amenities.contains("Covered")) &&
-                (SpotFilter.OPEN_24H !in filters || spot.operatingHours.is24Hours)
-        }
+        SpotFilters.apply(allSpots, filters, centre.latitude, centre.longitude, NEARBY_RADIUS_KM)
     }
     val pins = remember(visibleSpots) {
         visibleSpots.map { spot ->

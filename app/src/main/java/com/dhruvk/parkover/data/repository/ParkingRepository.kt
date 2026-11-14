@@ -64,8 +64,7 @@ class ParkingRepository : com.dhruvk.parkover.di.ParkingSource {
     override suspend fun getParkingSpots(): ApiResult<List<ParkingSpot>> = withContext(Dispatchers.IO) {
         when (val result = getParkingSpotsData()) {
             is ApiResult.Success -> {
-                val spots = result.data.parkingSpots.map { it.toDomainModel() }
-                ApiResult.Success(spots)
+                ApiResult.Success(parkingSpotsFromApi(result.data.parkingSpots))
             }
             is ApiResult.Error -> result
             is ApiResult.Loading -> result
@@ -80,50 +79,6 @@ class ParkingRepository : com.dhruvk.parkover.di.ParkingSource {
         }
     }
     
-    // Extension function to convert API model to domain model
-    private fun ParkingSpotApi.toDomainModel(): ParkingSpot {
-        return ParkingSpot(
-            id = this.id,
-            name = this.name,
-            address = this.address,
-            latitude = this.latitude,
-            longitude = this.longitude,
-            pricePerHourTwoWheeler = this.pricePerHourTwoWheeler,
-            pricePerHourFourWheeler = this.pricePerHourFourWheeler,
-            pricePerHourHeavy = this.pricePerHourHeavy,
-            pricePerDayTwoWheeler = this.pricePerDayTwoWheeler,
-            pricePerDayFourWheeler = this.pricePerDayFourWheeler,
-            pricePerDayHeavy = this.pricePerDayHeavy,
-            totalSpotsTwoWheeler = this.totalSpotsTwoWheeler,
-            totalSpotsFourWheeler = this.totalSpotsFourWheeler,
-            totalSpotsHeavy = this.totalSpotsHeavy,
-            // Available spots will come from Firestore (dynamic data)
-            availableSpotsTwoWheeler = this.totalSpotsTwoWheeler,
-            availableSpotsFourWheeler = this.totalSpotsFourWheeler,
-            availableSpotsHeavy = this.totalSpotsHeavy,
-            floors = this.floors.map { floor ->
-                Floor(
-                    floorNumber = floor.floorNumber,
-                    name = floor.name,
-                    totalSpots = floor.totalSpots,
-                    availableSpots = floor.totalSpots, // Will be updated from Firestore
-                    priceMultiplier = floor.priceMultiplier
-                )
-            },
-            amenities = this.amenities,
-            images = this.images,
-            rating = this.rating,
-            reviewCount = this.reviewCount,
-            operatingHours = OperatingHours(
-                is24Hours = this.operatingHours.is24Hours,
-                openTime = this.operatingHours.openTime,
-                closeTime = this.operatingHours.closeTime,
-                closedDays = this.operatingHours.closedDays
-            ),
-            isActive = this.isActive
-        )
-    }
-    
     companion object {
         @Volatile
         private var INSTANCE: ParkingRepository? = null
@@ -134,4 +89,65 @@ class ParkingRepository : com.dhruvk.parkover.di.ParkingSource {
             }
         }
     }
+}
+
+/**
+ * Maps the parking list from the API, skipping entries that can't be shown (no id, name or
+ * position) instead of failing the whole list because of one bad row.
+ */
+internal fun parkingSpotsFromApi(spots: List<ParkingSpotApi?>?): List<ParkingSpot> =
+    spots.orEmpty().mapNotNull { api -> api?.let { runCatching { it.toDomainModel() }.getOrNull() } }
+
+/** API model → domain model, or null when required fields are missing. */
+internal fun ParkingSpotApi.toDomainModel(): ParkingSpot? {
+    val id = id?.takeIf { it.isNotBlank() } ?: return null
+    val name = name?.takeIf { it.isNotBlank() } ?: return null
+    val lat = latitude ?: return null
+    val lng = longitude ?: return null
+    if (lat == 0.0 && lng == 0.0) return null
+    val two = totalSpotsTwoWheeler ?: 0
+    val four = totalSpotsFourWheeler ?: 0
+    val heavy = totalSpotsHeavy ?: 0
+    return ParkingSpot(
+        id = id,
+        name = name,
+        address = address.orEmpty(),
+        latitude = lat,
+        longitude = lng,
+        pricePerHourTwoWheeler = pricePerHourTwoWheeler ?: 0.0,
+        pricePerHourFourWheeler = pricePerHourFourWheeler ?: 0.0,
+        pricePerHourHeavy = pricePerHourHeavy ?: 0.0,
+        pricePerDayTwoWheeler = pricePerDayTwoWheeler ?: 0.0,
+        pricePerDayFourWheeler = pricePerDayFourWheeler ?: 0.0,
+        pricePerDayHeavy = pricePerDayHeavy ?: 0.0,
+        totalSpotsTwoWheeler = two,
+        totalSpotsFourWheeler = four,
+        totalSpotsHeavy = heavy,
+        // Live free counts come from Firestore; start as "all free".
+        availableSpotsTwoWheeler = two,
+        availableSpotsFourWheeler = four,
+        availableSpotsHeavy = heavy,
+        floors = floors.orEmpty().filterNotNull().map { floor ->
+            Floor(
+                floorNumber = floor.floorNumber ?: 0,
+                name = floor.name.orEmpty(),
+                totalSpots = floor.totalSpots ?: 0,
+                availableSpots = floor.totalSpots ?: 0,
+                priceMultiplier = floor.priceMultiplier ?: 1.0
+            )
+        },
+        amenities = amenities.orEmpty().filterNotNull(),
+        images = images.orEmpty().filterNotNull(),
+        rating = rating ?: 0.0,
+        reviewCount = reviewCount ?: 0,
+        operatingHours = operatingHours?.let {
+            OperatingHours(
+                is24Hours = it.is24Hours ?: false,
+                openTime = it.openTime ?: OperatingHours().openTime,
+                closeTime = it.closeTime ?: OperatingHours().closeTime,
+                closedDays = it.closedDays.orEmpty().filterNotNull()
+            )
+        } ?: OperatingHours(),
+        isActive = isActive ?: true
+    )
 }

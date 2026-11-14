@@ -127,9 +127,7 @@ class LocationHelper(private val context: Context) {
                 // Prefer subLocality (neighborhood) or locality (city) over featureName (which can be street number).
                 // In India the on-device geocoder often returns these in Devanagari even when asked for
                 // English, so skip non-Latin values; the road name (thoroughfare) is usually English.
-                listOf(address.subLocality, address.locality, address.thoroughfare, address.subAdminArea, address.adminArea)
-                    .firstOrNull { !it.isNullOrBlank() && it.isLatinScript() }
-                    ?: "Current Location"
+                pickAreaName(listOf(address.subLocality, address.locality, address.thoroughfare, address.subAdminArea, address.adminArea))
             } else {
                 "Current Location"
             }
@@ -169,6 +167,10 @@ class LocationHelper(private val context: Context) {
         private val GEOCODER_LOCALE = Locale("en", "IN")
 
         private fun String.isLatinScript(): Boolean = all { it.code < 0x0250 }
+
+        /** First usable English (Latin-script) name, most specific first; never Devanagari. */
+        fun pickAreaName(candidates: List<String?>): String =
+            candidates.firstOrNull { !it.isNullOrBlank() && it.isLatinScript() } ?: "Current Location"
 
         fun calculateDistance(
             lat1: Double, lon1: Double,

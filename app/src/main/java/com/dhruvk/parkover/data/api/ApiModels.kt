@@ -44,42 +44,43 @@ data class ParkingSpotsResponse(
     @SerializedName("amenitiesMaster") val amenitiesMaster: List<AmenityApi>
 )
 
+// Fields are nullable: the JSON is hand-edited and Gson leaves missing fields null.
 data class ParkingSpotApi(
-    @SerializedName("id") val id: String,
-    @SerializedName("name") val name: String,
-    @SerializedName("address") val address: String,
-    @SerializedName("latitude") val latitude: Double,
-    @SerializedName("longitude") val longitude: Double,
-    @SerializedName("pricePerHourTwoWheeler") val pricePerHourTwoWheeler: Double,
-    @SerializedName("pricePerHourFourWheeler") val pricePerHourFourWheeler: Double,
-    @SerializedName("pricePerHourHeavy") val pricePerHourHeavy: Double,
-    @SerializedName("pricePerDayTwoWheeler") val pricePerDayTwoWheeler: Double,
-    @SerializedName("pricePerDayFourWheeler") val pricePerDayFourWheeler: Double,
-    @SerializedName("pricePerDayHeavy") val pricePerDayHeavy: Double,
-    @SerializedName("totalSpotsTwoWheeler") val totalSpotsTwoWheeler: Int,
-    @SerializedName("totalSpotsFourWheeler") val totalSpotsFourWheeler: Int,
-    @SerializedName("totalSpotsHeavy") val totalSpotsHeavy: Int,
-    @SerializedName("floors") val floors: List<FloorApi>,
-    @SerializedName("amenities") val amenities: List<String>,
-    @SerializedName("images") val images: List<String>,
-    @SerializedName("rating") val rating: Double,
-    @SerializedName("reviewCount") val reviewCount: Int,
-    @SerializedName("operatingHours") val operatingHours: OperatingHoursApi,
-    @SerializedName("isActive") val isActive: Boolean
+    @SerializedName("id") val id: String? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("address") val address: String? = null,
+    @SerializedName("latitude") val latitude: Double? = null,
+    @SerializedName("longitude") val longitude: Double? = null,
+    @SerializedName("pricePerHourTwoWheeler") val pricePerHourTwoWheeler: Double? = null,
+    @SerializedName("pricePerHourFourWheeler") val pricePerHourFourWheeler: Double? = null,
+    @SerializedName("pricePerHourHeavy") val pricePerHourHeavy: Double? = null,
+    @SerializedName("pricePerDayTwoWheeler") val pricePerDayTwoWheeler: Double? = null,
+    @SerializedName("pricePerDayFourWheeler") val pricePerDayFourWheeler: Double? = null,
+    @SerializedName("pricePerDayHeavy") val pricePerDayHeavy: Double? = null,
+    @SerializedName("totalSpotsTwoWheeler") val totalSpotsTwoWheeler: Int? = null,
+    @SerializedName("totalSpotsFourWheeler") val totalSpotsFourWheeler: Int? = null,
+    @SerializedName("totalSpotsHeavy") val totalSpotsHeavy: Int? = null,
+    @SerializedName("floors") val floors: List<FloorApi>? = null,
+    @SerializedName("amenities") val amenities: List<String>? = null,
+    @SerializedName("images") val images: List<String>? = null,
+    @SerializedName("rating") val rating: Double? = null,
+    @SerializedName("reviewCount") val reviewCount: Int? = null,
+    @SerializedName("operatingHours") val operatingHours: OperatingHoursApi? = null,
+    @SerializedName("isActive") val isActive: Boolean? = null
 )
 
 data class FloorApi(
-    @SerializedName("floorNumber") val floorNumber: Int,
-    @SerializedName("name") val name: String,
-    @SerializedName("totalSpots") val totalSpots: Int,
-    @SerializedName("priceMultiplier") val priceMultiplier: Double
+    @SerializedName("floorNumber") val floorNumber: Int? = null,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("totalSpots") val totalSpots: Int? = null,
+    @SerializedName("priceMultiplier") val priceMultiplier: Double? = null
 )
 
 data class OperatingHoursApi(
-    @SerializedName("is24Hours") val is24Hours: Boolean,
-    @SerializedName("openTime") val openTime: String,
-    @SerializedName("closeTime") val closeTime: String,
-    @SerializedName("closedDays") val closedDays: List<String>
+    @SerializedName("is24Hours") val is24Hours: Boolean? = null,
+    @SerializedName("openTime") val openTime: String? = null,
+    @SerializedName("closeTime") val closeTime: String? = null,
+    @SerializedName("closedDays") val closedDays: List<String>? = null
 )
 
 data class AmenityApi(

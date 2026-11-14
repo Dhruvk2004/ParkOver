@@ -2,7 +2,9 @@
 
 How we try to break every feature before a real user does. The approach is adapted from the CometChat Flutter UIKit master app, translated to Kotlin + Jetpack Compose and to ParkOver's own risks: maps, GPS, live parking availability and bookings.
 
-Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fakes, test tags, `MapTestHooks`, a failure screenshot/logcat rule and `scripts/run-device-tests.sh` are in. Running now: 16 JVM unit tests, 4 on-device tests (Nothing A015), 21 Firestore emulator tests.
+Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fakes, test tags, `MapTestHooks`, a failure screenshot/logcat rule and `scripts/run-device-tests.sh` are in. **Phase 1 done:** P0 unit scenarios covered. Running now: 48 JVM unit tests (debug and release), 4 on-device tests (Nothing A015), 21 Firestore emulator tests.
+
+Bugs found by Phase 1 and fixed: one malformed parking entry crashed the whole list (SPOT-03); valid Delhi, BH-series and hyphenated plates were rejected (VEH-02); password reset sent the untrimmed email (AUTH-06).
 
 ---
 

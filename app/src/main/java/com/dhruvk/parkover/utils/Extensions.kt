@@ -31,26 +31,25 @@ fun Context.showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
 }
 
 // String Extensions
-fun String.isValidEmail(): Boolean {
-    return android.util.Patterns.EMAIL_ADDRESS.matcher(this).matches()
-}
+private val EMAIL_REGEX = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$")
+
+/** Plain regex (not android.util.Patterns) so it also runs in JVM tests. Ignores outer spaces. */
+fun String.isValidEmail(): Boolean = EMAIL_REGEX.matches(trim())
 
 fun String.isValidPassword(): Boolean {
     return this.length >= Constants.MIN_PASSWORD_LENGTH
 }
 
-fun String.isValidVehicleNumber(): Boolean {
-    val cleanNumber = this.replace(" ", "").uppercase()
-    return cleanNumber.matches(Regex(Constants.VEHICLE_NUMBER_REGEX))
-}
+/** How plates are stored and compared: no spaces, hyphens or dots, upper case ("MH02AB1234"). */
+fun String.normalizeVehicleNumber(): String = replace(Regex("[\\s.-]"), "").uppercase()
 
-fun String.formatVehicleNumber(): String {
-    val clean = this.replace(" ", "").uppercase()
-    return if (clean.length >= 10) {
-        "${clean.substring(0, 2)} ${clean.substring(2, 4)} ${clean.substring(4, 6)} ${clean.substring(6)}"
-    } else {
-        clean
-    }
+/**
+ * Indian plates: standard (MH 02 AB 1234, DL 3C AB 1234, DL 10 CAB 1234) and
+ * Bharat series (22 BH 1234 AA). Spacing, hyphens and case don't matter.
+ */
+fun String.isValidVehicleNumber(): Boolean {
+    val clean = normalizeVehicleNumber()
+    return clean.matches(Regex(Constants.VEHICLE_NUMBER_REGEX)) || clean.matches(Regex(Constants.BH_VEHICLE_NUMBER_REGEX))
 }
 
 // Date Extensions

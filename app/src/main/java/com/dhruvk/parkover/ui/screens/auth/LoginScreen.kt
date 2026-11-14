@@ -224,7 +224,7 @@ fun LoginScreen(
                     .clip(RoundedCornerShape(8.dp))
                     .clickable {
                         if (android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-                            viewModel.sendPasswordReset(email)
+                            viewModel.sendPasswordReset(email.trim())
                         } else {
                             emailError = "Enter your email first, then tap Forgot password"
                         }

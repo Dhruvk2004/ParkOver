@@ -29,7 +29,10 @@ object Constants {
     
     // Validation
     const val MIN_PASSWORD_LENGTH = 6
-    const val VEHICLE_NUMBER_REGEX = "^[A-Z]{2}[0-9]{1,2}[A-Z]{1,2}[0-9]{4}$"
+    // State, RTO number, optional category + series letters, 4-digit number: MH02AB1234, DL3CAB1234
+    const val VEHICLE_NUMBER_REGEX = "^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$"
+    // Bharat series: year, BH, 4-digit number, 1-2 letters: 22BH1234AA
+    const val BH_VEHICLE_NUMBER_REGEX = "^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$"
     
     // Request Codes
     const val REQUEST_LOCATION_PERMISSION = 1001
