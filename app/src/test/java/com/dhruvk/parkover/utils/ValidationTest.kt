@@ -12,7 +12,7 @@ class ValidationTest {
     private fun ok(r: ValidationResult) = r.isValid()
 
     @Test fun AUTH_06_emailAcceptsNormalAddresses() {
-        listOf("dhruv@gmail.com", "test-dev@gmail.com", "a.b+tag@company.co.in", "x_y@sub.domain.org")
+        listOf("dhruv@gmail.com", "test-driver@example.com", "a.b+tag@company.co.in", "x_y@sub.domain.org")
             .forEach { assertTrue(it, ok(ValidationUtils.validateEmail(it))) }
     }
 
