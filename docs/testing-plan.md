@@ -2,9 +2,9 @@
 
 How we try to break every feature before a real user does. The approach is adapted from the CometChat Flutter UIKit master app, translated to Kotlin + Jetpack Compose and to ParkOver's own risks: maps, GPS, live parking availability and bookings.
 
-Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fakes, test tags, `MapTestHooks`, a failure screenshot/logcat rule and `scripts/run-device-tests.sh` are in. **Phase 1 done:** P0 unit scenarios covered. Running now: 48 JVM unit tests (debug and release), 4 on-device tests (Nothing A015), 21 Firestore emulator tests.
+Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fakes, test tags, `MapTestHooks`, a failure screenshot/logcat rule and `scripts/run-device-tests.sh` are in. **Phase 1 done:** P0 unit scenarios covered (48 JVM tests, debug and release). Bugs found and fixed: one malformed parking entry crashed the whole list (SPOT-03); valid Delhi, BH-series and hyphenated plates were rejected (VEH-02); password reset sent the untrimmed email (AUTH-06).
 
-Bugs found by Phase 1 and fixed: one malformed parking entry crashed the whole list (SPOT-03); valid Delhi, BH-series and hyphenated plates were rejected (VEH-02); password reset sent the untrimmed email (AUTH-06).
+**Phase 3 done:** 22 on-device tests on the Nothing A015, run against the **local Firebase emulator** (Firestore + Auth, real rules) over USB, so they never touch `parkover-b042b`. The runner saves and restores the phone's real login. Covered: MAP-03/06, ROUTE-01/02/03/04/07/08, SRCH-01/03/04/06, FLT-04, SPOT-02, LOC-06, BOOK-01/06/07/08/09/10, BKL-04, AUTH-01/03/04. Bugs found and fixed: Firestore held an offline booking and **committed it when the connection came back** (BOOK-09; now fails fast with "nothing was booked"); a failing place search crashed Home (SRCH-06); own parkings waited for the slower place search.
 
 ---
 
@@ -336,10 +336,12 @@ Status (14 Nov): risks 1–4 are **fixed** in code and rules, covered by `firest
 # Layer 1: JVM unit tests (app/src/test)
 ./gradlew testDebugUnitTest
 
-# Layer 2: on-device tests with fakes (app/src/androidTest). Keeps the app installed and
-# logged in; results, failure screenshots and logcat land in test-results/<timestamp>/
+# Layer 2: on-device tests with fakes + the local Firebase emulator (app/src/androidTest).
+# Starts the emulator, forwards it over USB, keeps the app installed and your login intact;
+# results, failure screenshots and logcat land in test-results/<timestamp>/
 scripts/run-device-tests.sh 001206477020888
-scripts/run-device-tests.sh 001206477020888 com.dhruvk.parkover.home.HomeRouteTest
+scripts/run-device-tests.sh 001206477020888 com.dhruvk.parkover.booking            # a package
+scripts/run-device-tests.sh 001206477020888 com.dhruvk.parkover.home.HomeRouteTest # a class
 
 # Firestore rules + booking race (needs Java 21, e.g. Android Studio's bundled JBR)
 cd firestore-tests && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" npm test
@@ -353,3 +355,6 @@ cd firestore-tests && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/C
 - Chain rules as `GrantPermissionRule → AppTestRule → compose → FailureArtifactsRule`.
 - Wait with `compose.waitForPins(...)` / `compose.waitUntil { … }`, never `waitForIdle()` on Home.
 - Tap pins with `compose.tapPin(id)`; read map state from `MapTestHooks`.
+- Tests that write data use `AppTestRule(resetBackend = true)` (wipes the emulator) and
+  `TestBackend.seed/list` to plant or inspect documents as an admin (e.g. another driver's lock).
+- Simulate Firestore offline with `TestBackend.firestore().disableNetwork()`; always re-enable in `finally`.

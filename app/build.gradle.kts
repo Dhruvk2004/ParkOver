@@ -35,7 +35,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner = "com.dhruvk.parkover.testing.ParkOverTestRunner"
 
         buildConfigField("String", "ORS_API_KEY", "\"$orsApiKey\"")
     }

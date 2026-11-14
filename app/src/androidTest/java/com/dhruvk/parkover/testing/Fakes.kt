@@ -40,16 +40,24 @@ class FakeRouting(
     var distances: List<Double?>? = null
 ) : RoutingService {
     val routeCalls = AtomicInteger()
+    @Volatile var lastFrom: LatLng? = null
+    /** Per-destination answers (by spot latitude) for tests that need different routes. */
+    var byDestination: Map<Double, Pair<Long, RouteInfo?>> = emptyMap()
     override suspend fun route(from: LatLng, to: LatLng): RouteInfo? {
         routeCalls.incrementAndGet()
+        lastFrom = from
+        byDestination[to.latitude]?.let { (wait, answer) -> delay(wait); return answer }
         if (delayMs > 0) delay(delayMs)
         return result
     }
     override suspend fun roadDistancesKm(from: LatLng, destinations: List<LatLng>) = distances
 }
 
-class FakePlaceSearch(var results: List<SearchResult> = emptyList()) : PlaceSearchService {
-    override suspend fun search(query: String, near: LatLng) = results
+class FakePlaceSearch(var results: List<SearchResult> = emptyList(), var fail: Boolean = false) : PlaceSearchService {
+    override suspend fun search(query: String, near: LatLng): List<SearchResult> {
+        if (fail) throw java.io.IOException("Photon unreachable")
+        return results
+    }
 }
 
 class FakeLocation(

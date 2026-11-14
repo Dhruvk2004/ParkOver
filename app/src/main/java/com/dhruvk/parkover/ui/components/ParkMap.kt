@@ -159,6 +159,7 @@ fun ParkMap(
             controller.map = null
             MapTestHooks.onStyle(false)
             MapTestHooks.onPinClickHandler(null)
+            MapTestHooks.onMapClickHandler(null)
             mapView.onDestroy()
         }
     }
@@ -184,6 +185,7 @@ fun ParkMap(
                 style = loaded
                 MapTestHooks.onStyle(true)
                 MapTestHooks.onPinClickHandler { id -> currentOnPinClick(id) }
+                MapTestHooks.onMapClickHandler { currentOnMapClick() }
                 currentOnMapReady()
             }
             map.addOnMapClickListener { point ->

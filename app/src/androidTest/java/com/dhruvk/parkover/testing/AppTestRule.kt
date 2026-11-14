@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Wrap the activity rule with this (RuleChain.outerRule(app).around(compose)) so it runs first:
  *  - installs fakes into AppServices before the app starts, and resets them afterwards;
- *  - signs in with the dev/test account from local.properties (never typed into the UI).
+ *  - optionally wipes the emulator first (resetBackend = true) for tests that write data;
+ *  - signs in a throwaway emulator user (or the dev account from local.properties when run live).
  * Configure fakes through the constructor: the app reads them as soon as it launches.
  */
 class AppTestRule(
@@ -25,7 +26,8 @@ class AppTestRule(
     val placeSearch: FakePlaceSearch = FakePlaceSearch(),
     val location: FakeLocation = FakeLocation(),
     val parking: FakeParkingSource = FakeParkingSource(),
-    private val signIn: Boolean = true
+    private val signIn: Boolean = true,
+    private val resetBackend: Boolean = false
 ) : TestWatcher() {
 
     override fun starting(description: Description) {
@@ -33,7 +35,8 @@ class AppTestRule(
         AppServices.placeSearch = placeSearch
         AppServices.parkingSource = parking
         AppServices.locationFactory = { location }
-        if (signIn) ensureSignedIn()
+        if (resetBackend) TestBackend.reset()
+        if (signIn) ensureSignedIn() else FirebaseAuth.getInstance().signOut()
     }
 
     override fun finished(description: Description) {
@@ -41,6 +44,10 @@ class AppTestRule(
     }
 
     private fun ensureSignedIn() {
+        if (TestBackend.usingEmulator) {
+            TestBackend.signIn(TestBackend.DRIVER_A)
+            return
+        }
         val auth = FirebaseAuth.getInstance()
         if (auth.currentUser != null) return
         check(BuildConfig.DEV_LOGIN_EMAIL.isNotBlank()) {

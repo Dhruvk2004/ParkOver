@@ -17,6 +17,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import java.util.UUID
 
@@ -161,6 +162,7 @@ class BookingRepository {
         val buckets = lockBuckets(booking.entryTime.toDate().time, booking.exitTime.toDate().time)
 
         return try {
+            requireServer(availabilityCollection.document(booking.parkingId)) // public, readable before booking
             firestore.runTransaction { transaction ->
                 // All reads first (Firestore requires reads before writes).
                 val lockRefs = buckets.map { slotLocksCollection.document(lockId(booking.parkingId, booking.spotNumber, it)) }
@@ -232,6 +234,11 @@ class BookingRepository {
     suspend fun cancelBooking(booking: Booking): Result<Unit> = runCatching {
         val userId = auth.currentUser?.uid ?: throw Exception("You're signed out. Log in and try again.")
         val buckets = lockBuckets(booking.entryTime.toDate().time, booking.exitTime.toDate().time)
+        try {
+            requireServer(bookingsCollection.document(booking.id))
+        } catch (e: Exception) {
+            throw BookingRules.errorFor(e)
+        }
         firestore.runTransaction { transaction ->
             val bookingRef = bookingsCollection.document(booking.id)
             val fresh = transaction.get(bookingRef)
@@ -286,6 +293,7 @@ class BookingRepository {
             updatedAt = Timestamp.now()
         )
         try {
+            requireServer(bookingsCollection.document(booking.id))
             firestore.runTransaction { transaction ->
                 val bookingRef = bookingsCollection.document(booking.id)
                 val fresh = transaction.get(bookingRef)
@@ -312,6 +320,22 @@ class BookingRepository {
         VehicleType.HEAVY -> "availableSpotsHeavy"
     }
 
+    /**
+     * Firestore holds a transaction while offline and quietly commits it once the connection is
+     * back, so a driver who gave up at a spinner could still end up booked. Check the server is
+     * reachable first and fail fast instead. [ref] must be a document this user may read.
+     */
+    private suspend fun requireServer(ref: com.google.firebase.firestore.DocumentReference) {
+        val offline = FirebaseFirestoreException("Offline", FirebaseFirestoreException.Code.UNAVAILABLE)
+        val result = withTimeoutOrNull(ONLINE_CHECK_MS) {
+            runCatching { ref.get(com.google.firebase.firestore.Source.SERVER).await() }
+        } ?: throw offline
+        result.exceptionOrNull()?.let { e ->
+            if (e is FirebaseFirestoreException && e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
+            throw offline
+        }
+    }
+
     private fun lockData(parkingId: String, spotNumber: String, bucket: Long, bookingId: String, userId: String) = mapOf(
         "parkingId" to parkingId,
         "spotNumber" to spotNumber,
@@ -329,6 +353,8 @@ class BookingRepository {
         const val SLOT_LOCKS = "slot_locks"
         /** Bays are locked in 30-minute buckets; check-in times are on the half hour. */
         const val LOCK_BUCKET_MS = 30 * 60_000L
+        /** How long to wait for the server before saying "you're offline". */
+        const val ONLINE_CHECK_MS = 10_000L
         val ACTIVE_STATUSES = setOf(BookingStatus.PENDING.name, BookingStatus.CONFIRMED.name, BookingStatus.ACTIVE.name)
 
         fun bucketOf(timeMs: Long): Long = Math.floorDiv(timeMs, LOCK_BUCKET_MS)

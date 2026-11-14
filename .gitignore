@@ -25,3 +25,6 @@ local.properties
 
 # Device test runs
 test-results/
+
+# Firebase emulator logs
+*-debug.log

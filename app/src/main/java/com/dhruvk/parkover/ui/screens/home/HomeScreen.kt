@@ -248,7 +248,17 @@ fun HomeScreen(
                     .filter { it.name.contains(query, ignoreCase = true) || it.address.contains(query, ignoreCase = true) }
                     .take(3)
                     .map { SearchResult(it.name, it.address, it.latitude, it.longitude, SPOT_RESULT_PREFIX + it.id) }
-                val places = AppServices.placeSearch.search(query, latestCentre)
+                // Our own parkings show straight away; places follow when (and if) search answers.
+                searchResults.clear()
+                searchResults.addAll(ownSpots)
+                showSearchResults = searchResults.isNotEmpty()
+                val places = try {
+                    AppServices.placeSearch.search(query, latestCentre)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    emptyList() // place search down: keep our own results, never crash Home
+                }
                 searchResults.clear()
                 searchResults.addAll(ownSpots + places)
                 showSearchResults = searchResults.isNotEmpty()
