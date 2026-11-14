@@ -157,13 +157,16 @@ fun ParkMap(
             lifecycle.removeObserver(observer)
             sync(Lifecycle.State.CREATED)
             controller.map = null
+            MapTestHooks.onStyle(false)
+            MapTestHooks.onPinClickHandler(null)
             mapView.onDestroy()
         }
     }
 
     LaunchedEffect(mapView) {
         val styleJson = loadParkOverStyle()
-        mapView.getMapAsync { map ->
+        // MapLibre must only be touched on the main thread; don't rely on where we resumed.
+        withContext(Dispatchers.Main) { mapView.getMapAsync { map ->
             controller.map = map
             map.uiSettings.apply {
                 isCompassEnabled = false
@@ -179,6 +182,8 @@ fun ParkMap(
             map.setStyle(builder) { loaded ->
                 addOverlayLayers(loaded)
                 style = loaded
+                MapTestHooks.onStyle(true)
+                MapTestHooks.onPinClickHandler { id -> currentOnPinClick(id) }
                 currentOnMapReady()
             }
             map.addOnMapClickListener { point ->
@@ -190,7 +195,7 @@ fun ParkMap(
             map.addOnCameraIdleListener {
                 map.cameraPosition.target?.let { currentOnCameraIdle(it, map.cameraPosition.zoom) }
             }
-        }
+        } }
     }
 
     // Push data into the map whenever it changes.
@@ -207,6 +212,7 @@ fun ParkMap(
             }
         }
         s.getSourceAs<GeoJsonSource>(SRC_PINS)?.setGeoJson(FeatureCollection.fromFeatures(features))
+        MapTestHooks.onPins(pins.map { it.id }, selectedPinId)
     }
     LaunchedEffect(style, route) {
         val s = style ?: return@LaunchedEffect
@@ -214,6 +220,7 @@ fun ParkMap(
             FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(pts.map { Point.fromLngLat(it.longitude, it.latitude) })))
         } ?: FeatureCollection.fromFeatures(emptyList())
         s.getSourceAs<GeoJsonSource>(SRC_ROUTE)?.setGeoJson(line)
+        MapTestHooks.onRoute(route?.size ?: 0)
     }
     LaunchedEffect(style, userLocation) {
         val s = style ?: return@LaunchedEffect

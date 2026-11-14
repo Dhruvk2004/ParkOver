@@ -53,6 +53,14 @@ hiltNavigationCompose = "1.2.0"
 lifecycleRuntimeCompose = "2.9.0"
 maplibre = "11.13.5"
 
+# Testing
+mockk = "1.13.13"
+turbine = "1.2.0"
+orgJson = "20240303"
+androidxTestRunner = "1.6.2"
+androidxTestRules = "1.6.1"
+uiautomator = "2.3.0"
+
 # Hilt
 hilt = "2.51.1"
 
@@ -129,6 +137,18 @@ maplibre-android = { group = "org.maplibre.gl", name = "android-sdk", version.re
 
 # Lottie
 lottie-compose = { group = "com.airbnb.android", name = "lottie-compose", version.ref = "lottieCompose" }
+
+# Testing
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
+org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "androidxTestRules" }
+androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

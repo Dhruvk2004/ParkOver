@@ -59,11 +59,12 @@ class ParkingViewModel : ViewModel() {
         _parkingSpots.value = ApiResult.Loading
         viewModelScope.launch {
             Log.d(TAG, "Loading parking spots from API...")
-            when (val result = parkingRepository.getParkingSpots()) {
+            val source = com.dhruvk.parkover.di.AppServices.parkingSource
+            when (val result = source.getParkingSpots()) {
                 is ApiResult.Success -> {
                     staticParkingSpots = result.data
                     Log.d(TAG, "Loaded ${result.data.size} parking spots from API")
-                    availabilityRepository.checkAndInitializeAvailability(result.data)
+                    if (source.seedsAvailability) availabilityRepository.checkAndInitializeAvailability(result.data)
                     mergeWithAvailability()
                 }
                 is ApiResult.Error -> {

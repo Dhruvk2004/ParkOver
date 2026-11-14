@@ -22,3 +22,6 @@ local.properties
 
 # Kotlin compiler daemon logs
 .kotlin/
+
+# Device test runs
+test-results/

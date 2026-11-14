@@ -1,5 +1,6 @@
 package com.dhruvk.parkover.viewmodels
 
+import com.dhruvk.parkover.di.AppServices
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.model.Booking
@@ -180,8 +181,9 @@ class BookingFlowViewModel : ViewModel() {
             return
         }
         // Check-in in the past (screen left open): start now instead
-        if (data.checkInTime < System.currentTimeMillis()) {
-            setCheckInTime(System.currentTimeMillis())
+        val now = AppServices.clock.nowMillis()
+        if (data.checkInTime < now) {
+            setCheckInTime(now)
         }
         val current = _bookingData.value
         _submitState.value = SubmitState.Submitting
@@ -238,7 +240,7 @@ class BookingFlowViewModel : ViewModel() {
     companion object {
         const val HOUR = 3_600_000L
 
-        fun nextHalfHour(from: Long = System.currentTimeMillis()): Long =
+        fun nextHalfHour(from: Long = AppServices.clock.nowMillis()): Long =
             Calendar.getInstance().apply {
                 timeInMillis = from
                 set(Calendar.SECOND, 0)

@@ -34,6 +34,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.dhruvk.parkover.ui.TestTags
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -136,6 +138,7 @@ fun BookingSuccessScreen(
                 Spacer(Modifier.height(8.dp))
                 Text(
                     bookingId,
+                    modifier = Modifier.testTag(TestTags.BOOKING_ID),
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 2.sp,

@@ -1,6 +1,6 @@
 package com.dhruvk.parkover.data.repository
 
-import com.dhruvk.parkover.BuildConfig
+import com.dhruvk.parkover.di.RoutingService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -13,23 +13,26 @@ import java.net.URL
 data class RouteInfo(val points: List<LatLng>, val distanceKm: Double, val durationMin: Double)
 
 /**
- * Road distances and routes. Uses OpenRouteService (free key, 2,000 routes and 500 matrix calls a day)
+ * Road distances and routes over HTTP. Uses OpenRouteService (free key, 2,000 routes and 500 matrix calls a day)
  * when ORS_API_KEY is set. Debug builds without a key fall back to the public OSRM demo server,
  * which is fine for testing but not allowed for production traffic.
  */
-object RoutingRepository {
+class HttpRoutingService(
+    private val orsKey: String,
+    private val allowDemoFallback: Boolean,
+    private val orsBaseUrl: String = "https://api.openrouteservice.org/v2",
+    private val osrmBaseUrl: String = "https://router.project-osrm.org",
+    private val timeoutMs: Int = 15_000
+) : RoutingService {
 
-    private const val ORS = "https://api.openrouteservice.org/v2"
-    private const val OSRM = "https://router.project-osrm.org"
-    private val orsKey get() = BuildConfig.ORS_API_KEY
     private val useOrs get() = orsKey.isNotBlank()
-    private val enabled get() = useOrs || BuildConfig.DEBUG
+    private val enabled get() = useOrs || allowDemoFallback
 
-    suspend fun route(from: LatLng, to: LatLng): RouteInfo? = withContext(Dispatchers.IO) {
+    override suspend fun route(from: LatLng, to: LatLng): RouteInfo? = withContext(Dispatchers.IO) {
         if (!enabled) return@withContext null
         runCatching {
             if (useOrs) {
-                val json = get("$ORS/directions/driving-car?start=${from.lngLat()}&end=${to.lngLat()}", orsHeaders())
+                val json = get("$orsBaseUrl/directions/driving-car?start=${from.lngLat()}&end=${to.lngLat()}", orsHeaders())
                 val feature = json.getJSONArray("features").getJSONObject(0)
                 val summary = feature.getJSONObject("properties").getJSONObject("summary")
                 RouteInfo(
@@ -38,7 +41,7 @@ object RoutingRepository {
                     durationMin = summary.optDouble("duration") / 60
                 )
             } else {
-                val json = get("$OSRM/route/v1/driving/${from.lngLat()};${to.lngLat()}?overview=full&geometries=geojson")
+                val json = get("$osrmBaseUrl/route/v1/driving/${from.lngLat()};${to.lngLat()}?overview=full&geometries=geojson")
                 val r = json.getJSONArray("routes").getJSONObject(0)
                 RouteInfo(
                     points = r.getJSONObject("geometry").getJSONArray("coordinates").toLatLngs(),
@@ -49,8 +52,7 @@ object RoutingRepository {
         }.getOrNull()
     }
 
-    /** Road distance in km from [from] to each destination, in order; null where no road route exists. */
-    suspend fun roadDistancesKm(from: LatLng, destinations: List<LatLng>): List<Double?>? = withContext(Dispatchers.IO) {
+    override suspend fun roadDistancesKm(from: LatLng, destinations: List<LatLng>): List<Double?>? = withContext(Dispatchers.IO) {
         if (!enabled || destinations.isEmpty()) return@withContext null
         runCatching {
             if (useOrs) {
@@ -64,11 +66,11 @@ object RoutingRepository {
                     .put("destinations", JSONArray().apply { destinations.indices.forEach { put(it + 1) } })
                     .put("metrics", JSONArray().put("distance"))
                     .put("units", "km")
-                val row = post("$ORS/matrix/driving-car", body, orsHeaders()).getJSONArray("distances").getJSONArray(0)
+                val row = post("$orsBaseUrl/matrix/driving-car", body, orsHeaders()).getJSONArray("distances").getJSONArray(0)
                 List(destinations.size) { i -> row.optDouble(i).takeUnless { it.isNaN() } }
             } else {
                 val coords = (listOf(from) + destinations).joinToString(";") { it.lngLat() }
-                val row = get("$OSRM/table/v1/driving/$coords?sources=0&annotations=distance")
+                val row = get("$osrmBaseUrl/table/v1/driving/$coords?sources=0&annotations=distance")
                     .getJSONArray("distances").getJSONArray(0)
                 List(destinations.size) { i -> row.optDouble(i + 1).takeUnless { it.isNaN() }?.div(1000) }
             }
@@ -92,8 +94,8 @@ object RoutingRepository {
     private fun request(url: String, method: String, body: String?, headers: Map<String, String>): JSONObject {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 10_000
-            readTimeout = 15_000
+            connectTimeout = timeoutMs.coerceAtMost(10_000)
+            readTimeout = timeoutMs
             setRequestProperty("User-Agent", "ParkOver-Android")
             // ORS directions only serves application/geo+json and answers 406 to a plain JSON Accept.
             setRequestProperty("Accept", "application/json, application/geo+json")

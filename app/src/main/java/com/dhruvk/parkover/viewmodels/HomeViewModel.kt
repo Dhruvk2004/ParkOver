@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.utils.Constants
-import com.dhruvk.parkover.utils.LocationHelper
+import com.dhruvk.parkover.di.AppServices
 import org.maplibre.android.geometry.LatLng
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,7 +30,7 @@ enum class SpotFilter(val label: String) {
 /** Map screen state that should survive tab switches: location, filters, camera target. */
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val locationHelper = LocationHelper(application)
+    private val locationProvider = AppServices.location(application)
 
     private val fallback = UserLocation(
         latLng = LatLng(Constants.FALLBACK_LAT, Constants.FALLBACK_LNG),
@@ -54,13 +54,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     var lastCamera: Pair<LatLng, Double>? = null
 
     fun refreshLocation() {
-        if (!locationHelper.hasLocationPermission()) {
+        if (!locationProvider.hasPermission()) {
             _location.value = fallback
             return
         }
         viewModelScope.launch {
             _locating.value = true
-            val fix = runCatching { locationHelper.getCurrentLocation() }.getOrNull()
+            val fix = runCatching { locationProvider.currentLatLng() }.getOrNull()
             if (fix != null) {
                 val latLng = LatLng(fix.latitude, fix.longitude)
                 // Publish the position straight away; the on-device geocoder can take seconds.
@@ -68,7 +68,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 _location.value = UserLocation(latLng, previousName ?: "Current location", isFallback = false)
                 _locating.value = false
                 val name = withContext(Dispatchers.IO) {
-                    locationHelper.getLocationNameFromCoordinates(fix.latitude, fix.longitude)
+                    locationProvider.areaName(fix.latitude, fix.longitude)
                 }
                 if (_location.value.latLng == latLng) _location.value = _location.value.copy(areaName = name)
             }

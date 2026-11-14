@@ -2,7 +2,7 @@
 
 How we try to break every feature before a real user does. The approach is adapted from the CometChat Flutter UIKit master app, translated to Kotlin + Jetpack Compose and to ParkOver's own risks: maps, GPS, live parking availability and bookings.
 
-Status: **plan only**. Nothing below is built yet except two placeholder tests (`ExampleUnitTest`, `ExampleInstrumentedTest`).
+Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fakes, test tags, `MapTestHooks`, a failure screenshot/logcat rule and `scripts/run-device-tests.sh` are in. Running now: 16 JVM unit tests, 4 on-device tests (Nothing A015), 21 Firestore emulator tests.
 
 ---
 
@@ -328,21 +328,26 @@ Status (14 Nov): risks 1–4 are **fixed** in code and rules, covered by `firest
 
 ---
 
-## 7. Commands (target state)
+## 7. Commands
 
 ```bash
-# Layer 1
+# Layer 1: JVM unit tests (app/src/test)
 ./gradlew testDebugUnitTest
 
-# Layer 2 (emulator suite running: firebase emulators:start --only auth,firestore)
-./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.annotation=com.dhruvk.parkover.test.Integration
+# Layer 2: on-device tests with fakes (app/src/androidTest). Keeps the app installed and
+# logged in; results, failure screenshots and logcat land in test-results/<timestamp>/
+scripts/run-device-tests.sh 001206477020888
+scripts/run-device-tests.sh 001206477020888 com.dhruvk.parkover.home.HomeRouteTest
 
-# Rules
-cd firestore-tests && npm test
+# Firestore rules + booking race (needs Java 21, e.g. Android Studio's bundled JBR)
+cd firestore-tests && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" npm test
 
-# Layer 3 on the Nothing phone
-scripts/run-e2e.sh 001206477020888
-
-# Layer 4
-k6 run load/book-last-spot.js
+# Layer 3 / 4 (to build)
+# scripts/run-e2e.sh <serial>, k6 run load/book-last-spot.js
 ```
+
+### Writing a device test
+- Configure fakes through `AppTestRule(routing = …, parking = …, location = …)`: the app reads them at launch.
+- Chain rules as `GrantPermissionRule → AppTestRule → compose → FailureArtifactsRule`.
+- Wait with `compose.waitForPins(...)` / `compose.waitUntil { … }`, never `waitForIdle()` on Home.
+- Tap pins with `compose.tapPin(id)`; read map state from `MapTestHooks`.

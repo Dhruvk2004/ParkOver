@@ -1,6 +1,7 @@
 package com.dhruvk.parkover.data.repository
 
 import com.dhruvk.parkover.data.model.SearchResult
+import com.dhruvk.parkover.di.PlaceSearchService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -9,19 +10,19 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
+// Rough bounding box of India (minLon, minLat, maxLon, maxLat).
+private const val INDIA_BBOX = "68.1,6.5,97.4,35.7"
+
 /**
  * Free place search with Photon (komoot's OpenStreetMap search). The public server is fair-use:
  * keep requests debounced, and self-host Photon if traffic grows.
  */
-object PlaceSearchRepository {
+class PhotonPlaceSearch(private val baseUrl: String = "https://photon.komoot.io") : PlaceSearchService {
 
-    // Rough bounding box of India (minLon, minLat, maxLon, maxLat).
-    private const val INDIA_BBOX = "68.1,6.5,97.4,35.7"
-
-    suspend fun search(query: String, near: LatLng): List<SearchResult> = withContext(Dispatchers.IO) {
+    override suspend fun search(query: String, near: LatLng): List<SearchResult> = withContext(Dispatchers.IO) {
         runCatching {
             val q = URLEncoder.encode(query, "UTF-8")
-            val url = "https://photon.komoot.io/api/?q=$q&lat=${near.latitude}&lon=${near.longitude}" +
+            val url = "$baseUrl/api/?q=$q&lat=${near.latitude}&lon=${near.longitude}" +
                 "&limit=6&lang=en&bbox=$INDIA_BBOX"
             val conn = (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = 8_000

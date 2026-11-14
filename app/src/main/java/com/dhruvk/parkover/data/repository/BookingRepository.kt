@@ -7,6 +7,7 @@ import com.dhruvk.parkover.data.model.ParkingSlot
 import com.dhruvk.parkover.data.model.ParkingSpot
 import com.dhruvk.parkover.data.model.Vehicle
 import com.dhruvk.parkover.data.model.VehicleType
+import com.dhruvk.parkover.di.AppServices
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestoreException
@@ -87,7 +88,7 @@ class BookingRepository {
         if (spot.floors.isEmpty()) return emptyList()
         // Bays held from now on, from the slot locks (other users' bookings are private).
         // This is display only: the booking transaction is what actually stops double bookings.
-        val nowBucket = bucketOf(System.currentTimeMillis())
+        val nowBucket = bucketOf(AppServices.clock.nowMillis())
         val booked = try {
             slotLocksCollection
                 .whereEqualTo("parkingId", spot.id)
@@ -145,7 +146,7 @@ class BookingRepository {
     suspend fun createBooking(booking: Booking): Result<Booking> {
         val userId = auth.currentUser?.uid ?: return Result.failure(Exception("You're signed out. Log in and try again."))
 
-        if (booking.exitTime.toDate().time < System.currentTimeMillis()) {
+        if (booking.exitTime.toDate().time < AppServices.clock.nowMillis()) {
             return Result.failure(Exception("That time has already passed. Pick a later check-in."))
         }
 

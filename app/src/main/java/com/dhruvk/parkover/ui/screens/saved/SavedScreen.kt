@@ -50,7 +50,7 @@ import coil.compose.AsyncImage
 import com.dhruvk.parkover.data.model.AvailabilityStatus
 import com.dhruvk.parkover.data.model.ParkingSpot
 import com.dhruvk.parkover.data.repository.ApiResult
-import com.dhruvk.parkover.data.repository.RoutingRepository
+import com.dhruvk.parkover.di.AppServices
 import com.dhruvk.parkover.data.repository.formatRoadDistance
 import com.dhruvk.parkover.data.repository.SavedParking
 import com.dhruvk.parkover.ui.components.BadgeTone
@@ -95,7 +95,7 @@ fun SavedScreen(
         saved.orEmpty().mapNotNull { entry -> spots.firstOrNull { it.id == entry.parkingId } }
     }
     LaunchedEffect(liveSaved.map { it.id }, location.latLng) {
-        val distances = RoutingRepository.roadDistancesKm(
+        val distances = AppServices.routing.roadDistancesKm(
             location.latLng,
             liveSaved.map { LatLng(it.latitude, it.longitude) }
         ) ?: return@LaunchedEffect

@@ -20,7 +20,7 @@ sealed class ApiResult<out T> {
     object Loading : ApiResult<Nothing>()
 }
 
-class ParkingRepository {
+class ParkingRepository : com.dhruvk.parkover.di.ParkingSource {
     
     private val apiService = RetrofitClient.apiService
     
@@ -61,7 +61,7 @@ class ParkingRepository {
     }
     
     // Convert API model to domain model
-    suspend fun getParkingSpots(): ApiResult<List<ParkingSpot>> = withContext(Dispatchers.IO) {
+    override suspend fun getParkingSpots(): ApiResult<List<ParkingSpot>> = withContext(Dispatchers.IO) {
         when (val result = getParkingSpotsData()) {
             is ApiResult.Success -> {
                 val spots = result.data.parkingSpots.map { it.toDomainModel() }

@@ -70,6 +70,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.dhruvk.parkover.ui.TestTags
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -89,9 +91,8 @@ import com.dhruvk.parkover.data.model.AvailabilityStatus
 import com.dhruvk.parkover.data.model.ParkingSpot
 import com.dhruvk.parkover.data.model.SearchResult
 import com.dhruvk.parkover.data.repository.ApiResult
-import com.dhruvk.parkover.data.repository.PlaceSearchRepository
 import com.dhruvk.parkover.data.repository.RouteInfo
-import com.dhruvk.parkover.data.repository.RoutingRepository
+import com.dhruvk.parkover.di.AppServices
 import com.dhruvk.parkover.data.repository.formatDriveTime
 import com.dhruvk.parkover.data.repository.formatRoadDistance
 import com.dhruvk.parkover.ui.components.AvailabilityBar
@@ -162,7 +163,7 @@ fun HomeScreen(
     var selectedSpotId by rememberSaveable { mutableStateOf<String?>(null) }
     var route by remember { mutableStateOf<RouteInfo?>(null) }
     var routeLoading by remember { mutableStateOf(false) }
-    var hasPermission by remember { mutableStateOf(LocationHelper(context).hasLocationPermission()) }
+    var hasPermission by remember { mutableStateOf(AppServices.location(context).hasPermission()) }
     val mapController = remember { ParkMapController() }
     var mapReady by remember { mutableStateOf(false) }
 
@@ -233,7 +234,7 @@ fun HomeScreen(
         with(density) { mapController.fitBounds(from, spotLatLng, extraPx = 56.dp.roundToPx(), extraBottomPx = 236.dp.roundToPx()) }
         routeLoading = true
         try {
-            route = RoutingRepository.route(from, spotLatLng)?.also { r ->
+            route = AppServices.routing.route(from, spotLatLng)?.also { r ->
                 with(density) { mapController.fitPoints(r.points + from + spotLatLng, extraPx = 56.dp.roundToPx(), extraBottomPx = 236.dp.roundToPx()) }
             }
         } finally {
@@ -254,7 +255,7 @@ fun HomeScreen(
                     .filter { it.name.contains(query, ignoreCase = true) || it.address.contains(query, ignoreCase = true) }
                     .take(3)
                     .map { SearchResult(it.name, it.address, it.latitude, it.longitude, SPOT_RESULT_PREFIX + it.id) }
-                val places = PlaceSearchRepository.search(query, latestCentre)
+                val places = AppServices.placeSearch.search(query, latestCentre)
                 searchResults.clear()
                 searchResults.addAll(ownSpots + places)
                 showSearchResults = searchResults.isNotEmpty()
@@ -544,7 +545,7 @@ private fun SearchBar(query: String, onQueryChange: (String) -> Unit, onClear: (
                 cursorBrush = SolidColor(Purple),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().testTag(TestTags.HOME_SEARCH)
             )
         }
         if (query.isNotEmpty()) {
@@ -577,6 +578,7 @@ private fun SearchResultItem(result: SearchResult, onClick: () -> Unit) {
 private fun StatusBanner(text: String, action: String?, onAction: () -> Unit) {
     Row(
         modifier = Modifier
+            .testTag(TestTags.HOME_STATUS_BANNER)
             .fillMaxWidth()
             .shadow(3.dp, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))
@@ -610,6 +612,7 @@ private fun SpotSheet(
         color = Color.White,
         shadowElevation = 16.dp,
         modifier = Modifier
+            .testTag(TestTags.SPOT_SHEET)
             .fillMaxWidth()
             .padding(horizontal = 10.dp)
     ) {
@@ -667,7 +670,8 @@ private fun SpotSheet(
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = TextSecondary,
-                            maxLines = 1
+                            maxLines = 1,
+                            modifier = Modifier.testTag(TestTags.SPOT_SHEET_META)
                         )
                     }
                     Text(
