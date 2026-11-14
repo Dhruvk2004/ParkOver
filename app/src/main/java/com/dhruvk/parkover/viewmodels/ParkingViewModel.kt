@@ -48,8 +48,6 @@ class ParkingViewModel : ViewModel() {
     val selectedParkingSpot: StateFlow<ParkingSpot?> = _selectedParkingSpot.asStateFlow()
 
     // Booking status
-    private val _bookingStatus = MutableStateFlow<BookingStatus>(BookingStatus.Idle)
-    val bookingStatus: StateFlow<BookingStatus> = _bookingStatus.asStateFlow()
 
     init {
         loadParkingSpots()
@@ -135,32 +133,6 @@ class ParkingViewModel : ViewModel() {
         _selectedParkingSpot.value = null
     }
 
-    fun onBookingConfirmed(spotId: String, vehicleType: VehicleType, floorNumber: Int? = null) {
-        viewModelScope.launch {
-            _bookingStatus.value = BookingStatus.Processing
-            val result = availabilityRepository.decreaseAvailability(spotId, vehicleType, floorNumber)
-            _bookingStatus.value = if (result.isSuccess) {
-                BookingStatus.Success
-            } else {
-                BookingStatus.Error(result.exceptionOrNull()?.message ?: "Booking failed")
-            }
-        }
-    }
-
-    fun onBookingEnded(spotId: String, vehicleType: VehicleType, floorNumber: Int? = null) {
-        val spot = staticParkingSpots.find { it.id == spotId } ?: return
-        viewModelScope.launch {
-            availabilityRepository.increaseAvailability(
-                spotId = spotId,
-                vehicleType = vehicleType,
-                floorNumber = floorNumber,
-                maxTwoWheeler = spot.totalSpotsTwoWheeler,
-                maxFourWheeler = spot.totalSpotsFourWheeler,
-                maxHeavy = spot.totalSpotsHeavy
-            )
-        }
-    }
-
     fun getParkingSpotsNearLocation(
         latitude: Double,
         longitude: Double,
@@ -188,11 +160,4 @@ class ParkingViewModel : ViewModel() {
         val c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
         return r * c
     }
-}
-
-sealed class BookingStatus {
-    object Idle : BookingStatus()
-    object Processing : BookingStatus()
-    object Success : BookingStatus()
-    data class Error(val message: String) : BookingStatus()
 }

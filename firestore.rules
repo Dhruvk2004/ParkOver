@@ -1,11 +1,27 @@
 rules_version = '2';
 
 // ParkOver Firestore rules. Paste into Firebase console → Firestore → Rules → Publish.
+// Tested with the emulator: cd firestore-tests && npm test
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
     function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+    function isActive(status) { return status in ['PENDING', 'CONFIRMED', 'ACTIVE']; }
+    function docPath(collection, id) { return /databases/$(database)/documents/$(collection)/$(id); }
+
+    // 30-minute lock buckets, matching BookingRepository.LOCK_BUCKET_MS. Integer division in
+    // rules already rounds down for positive times (math.floor would turn it into a float).
+    function bucketOf(ts) { return ts.toMillis() / 1800000; }
+    // Last bucket an interval touches: the one holding the millisecond before exit.
+    function lastBucketOf(exitTs) { return (exitTs.toMillis() - 1) / 1800000; }
+    function lockPath(parkingId, spotNumber, bucket) {
+      return docPath('slot_locks', parkingId + '_' + spotNumber + '_' + string(bucket));
+    }
+    // The bay is locked by this booking (checked for the first and last bucket of the stay).
+    function lockedBy(b, bookingId, bucket) {
+      return getAfter(lockPath(b.parkingId, b.spotNumber, bucket)).data.bookingId == bookingId;
+    }
 
     // Profile, saved parkings and UPI IDs: only the owner.
     match /users/{uid} {
@@ -21,22 +37,89 @@ service cloud.firestore {
       allow create: if isUser(request.resource.data.userId);
     }
 
-    // Bookings: only the owner can create or change one.
-    // Reads are open to any signed-in user because the booking flow checks which bays are
-    // taken by querying other users' bookings. Tighten before launch (see the later plan).
+    // Bookings are private to their owner. Which bays are taken is public via slot_locks.
     match /bookings/{bookingId} {
-      allow read: if signedIn();
-      allow create: if isUser(request.resource.data.userId);
+      allow read: if isUser(resource.data.userId);
+
+      // A new booking must be active and hold the slot lock for its first and last bucket,
+      // written in the same transaction, so a client can't skip the double-booking check.
+      allow create: if isUser(request.resource.data.userId)
+                    && request.resource.data.id == bookingId
+                    && isActive(request.resource.data.bookingStatus)
+                    && request.resource.data.exitTime > request.resource.data.entryTime
+                    && lockedBy(request.resource.data, bookingId, bucketOf(request.resource.data.entryTime))
+                    && lockedBy(request.resource.data, bookingId, lastBucketOf(request.resource.data.exitTime));
+
+      // Owner can change an active booking (cancel, extend) but not move it or reopen it.
       allow update: if isUser(resource.data.userId)
-                    && request.resource.data.userId == resource.data.userId;
+                    && isActive(resource.data.bookingStatus)
+                    && request.resource.data.diff(resource.data).unchangedKeys().hasAll(
+                         ['id', 'userId', 'parkingId', 'spotNumber', 'floorNumber', 'vehicleType', 'entryTime', 'createdAt'])
+                    && request.resource.data.exitTime >= resource.data.exitTime
+                    // Extending must lock the new end of the stay in the same write.
+                    && (request.resource.data.exitTime == resource.data.exitTime
+                        || lockedBy(request.resource.data, bookingId, lastBucketOf(request.resource.data.exitTime)));
+
       allow delete: if false;
     }
 
-    // Live free-spot counts. Public: the app listens before sign-in, and counts aren't private.
-    // The app seeds these and adjusts them inside booking transactions.
+    // One document per bay per 30-minute bucket. Its existence means "taken".
+    // Readable by signed-in users (no personal details beyond an opaque user id).
+    match /slot_locks/{lockId} {
+      allow read: if signedIn();
+      allow create: if isUser(request.resource.data.userId)
+                    && request.resource.data.keys().hasOnly(['parkingId', 'spotNumber', 'bucket', 'bookingId', 'userId', 'expiresAt'])
+                    && request.resource.data.bucket is int
+                    && lockId == request.resource.data.parkingId + '_' + request.resource.data.spotNumber + '_'
+                                 + string(request.resource.data.bucket);
+      allow delete: if isUser(resource.data.userId);
+      allow update: if false;
+    }
+
+    // Live free-spot counts. Public read: the app shows them before sign-in.
     match /parking_availability/{parkingId} {
       allow read: if true;
-      allow write: if signedIn();
+
+      // Seeded by the app the first time a parking is seen. Counts can't be negative.
+      allow create: if signedIn()
+                    && request.resource.data.availableSpotsTwoWheeler >= 0
+                    && request.resource.data.availableSpotsFourWheeler >= 0
+                    && request.resource.data.availableSpotsHeavy >= 0;
+
+      // Every change is exactly -1 for a booking created in the same write, or +1 for one
+      // cancelled in the same write, for that booking's own vehicle type and floor.
+      allow update: if signedIn() && validCountChange(parkingId);
+    }
+
+    function countField(vehicleType) {
+      return vehicleType == 'TWO_WHEELER' ? 'availableSpotsTwoWheeler'
+           : (vehicleType == 'HEAVY' ? 'availableSpotsHeavy' : 'availableSpotsFourWheeler');
+    }
+
+    function validCountChange(parkingId) {
+      let bookingId = request.resource.data.lastBookingId;
+      let ref = docPath('bookings', bookingId);
+      let after = getAfter(ref).data;
+      let field = countField(after.vehicleType);
+      let created = !exists(ref) && isActive(after.bookingStatus);
+      let cancelled = exists(ref) && isActive(get(ref).data.bookingStatus) && after.bookingStatus == 'CANCELLED';
+      let delta = created ? -1 : 1;
+      return after.parkingId == parkingId
+          && after.userId == request.auth.uid
+          && (created || cancelled)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly([field, 'floorAvailability', 'lastUpdated', 'lastBookingId'])
+          && request.resource.data[field] == resource.data[field] + delta
+          && request.resource.data[field] >= 0
+          && validFloorChange(string(after.floorNumber), delta);
+    }
+
+    function validFloorChange(floorKey, delta) {
+      let before = resource.data.get('floorAvailability', {});
+      let now = request.resource.data.get('floorAvailability', {});
+      return now.diff(before).affectedKeys().hasOnly([floorKey])
+          && (!(floorKey in before)
+              || (now.get(floorKey, 0) == before[floorKey] + delta && now.get(floorKey, 0) >= 0));
     }
 
     // Support requests: users can file one, nobody can read them back from the app.

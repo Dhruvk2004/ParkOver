@@ -9,7 +9,7 @@ import com.dhruvk.parkover.data.model.Vehicle
 import com.dhruvk.parkover.data.model.VehicleType
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -26,8 +26,7 @@ class BookingRepository {
     private val bookingsCollection = firestore.collection("bookings")
     private val vehiclesCollection = firestore.collection("vehicles")
     private val availabilityCollection = firestore.collection("parking_availability")
-
-    private val activeStatuses = listOf(BookingStatus.CONFIRMED.name, BookingStatus.ACTIVE.name, BookingStatus.PENDING.name)
+    private val slotLocksCollection = firestore.collection(SLOT_LOCKS)
 
     // ---------- Vehicles ----------
 
@@ -86,13 +85,16 @@ class BookingRepository {
      */
     suspend fun getFloorsWithSpots(spot: ParkingSpot, vehicleType: VehicleType): List<FloorData> {
         if (spot.floors.isEmpty()) return emptyList()
+        // Bays held from now on, from the slot locks (other users' bookings are private).
+        // This is display only: the booking transaction is what actually stops double bookings.
+        val nowBucket = bucketOf(System.currentTimeMillis())
         val booked = try {
-            bookingsCollection
+            slotLocksCollection
                 .whereEqualTo("parkingId", spot.id)
-                .whereIn("bookingStatus", listOf(BookingStatus.CONFIRMED.name, BookingStatus.ACTIVE.name))
                 .get()
                 .await()
                 .documents
+                .filter { (it.getLong("bucket") ?: Long.MIN_VALUE) >= nowBucket }
                 .mapNotNull { it.getString("spotNumber") }
                 .toSet()
         } catch (e: Exception) {
@@ -132,31 +134,19 @@ class BookingRepository {
 
     // ---------- Bookings ----------
 
-    private suspend fun hasTimeConflict(booking: Booking): Boolean = try {
-        bookingsCollection
-            .whereEqualTo("parkingId", booking.parkingId)
-            .whereEqualTo("spotNumber", booking.spotNumber)
-            .get()
-            .await()
-            .toObjects(Booking::class.java)
-            .filter { it.bookingStatus.name in activeStatuses }
-            .any { existing ->
-                booking.entryTime.toDate().before(existing.exitTime.toDate()) &&
-                    booking.exitTime.toDate().after(existing.entryTime.toDate())
-            }
-    } catch (e: Exception) {
-        false
-    }
-
-    /** Creates the booking and decrements availability in one transaction. */
+    /**
+     * Creates the booking, its slot locks and the availability decrement in one transaction.
+     *
+     * Each 30-minute bucket of a bay has one lock document. Reading the locks inside the
+     * transaction makes two people booking the same bay and time collide: Firestore retries the
+     * loser, which then sees the winner's lock and fails with a clear message. Any error fails the
+     * booking (never "assume it's free").
+     */
     suspend fun createBooking(booking: Booking): Result<Booking> {
         val userId = auth.currentUser?.uid ?: return Result.failure(Exception("You're signed out. Log in and try again."))
 
         if (booking.exitTime.toDate().time < System.currentTimeMillis()) {
             return Result.failure(Exception("That time has already passed. Pick a later check-in."))
-        }
-        if (hasTimeConflict(booking)) {
-            return Result.failure(Exception("Spot ${booking.spotNumber} was just booked for that time. Pick another spot."))
         }
 
         val bookingId = newBookingId()
@@ -167,13 +157,17 @@ class BookingRepository {
             createdAt = Timestamp.now(),
             updatedAt = Timestamp.now()
         )
+        val buckets = lockBuckets(booking.entryTime.toDate().time, booking.exitTime.toDate().time)
 
         return try {
             firestore.runTransaction { transaction ->
+                // All reads first (Firestore requires reads before writes).
+                val lockRefs = buckets.map { slotLocksCollection.document(lockId(booking.parkingId, booking.spotNumber, it)) }
+                if (lockRefs.any { transaction.get(it).exists() }) throw SlotTakenException(booking.spotNumber)
                 val availRef = availabilityCollection.document(booking.parkingId)
                 val availSnapshot = transaction.get(availRef)
-                val updates = mutableMapOf<String, Any>()
 
+                val updates = mutableMapOf<String, Any>()
                 if (availSnapshot.exists()) {
                     val field = availabilityField(booking.vehicleType)
                     val current = availSnapshot.getLong(field) ?: 0
@@ -190,14 +184,19 @@ class BookingRepository {
                         updates["floorAvailability"] = floorAvail
                     }
                     updates["lastUpdated"] = Timestamp.now()
+                    // The rules only accept a -1 tied to a booking created in the same write.
+                    updates["lastBookingId"] = bookingId
                 }
 
                 transaction.set(bookingsCollection.document(bookingId), newBooking)
+                buckets.zip(lockRefs).forEach { (bucket, ref) ->
+                    transaction.set(ref, lockData(booking.parkingId, booking.spotNumber, bucket, bookingId, userId))
+                }
                 if (updates.isNotEmpty()) transaction.update(availRef, updates)
             }.await()
             Result.success(newBooking)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(e.toBookingError())
         }
     }
 
@@ -228,9 +227,18 @@ class BookingRepository {
         awaitClose { registration.remove() }
     }
 
+    /** Cancels an active booking, frees its slot locks and gives the bay back, once. */
     suspend fun cancelBooking(booking: Booking): Result<Unit> = runCatching {
+        val userId = auth.currentUser?.uid ?: throw Exception("You're signed out. Log in and try again.")
+        val buckets = lockBuckets(booking.entryTime.toDate().time, booking.exitTime.toDate().time)
         firestore.runTransaction { transaction ->
             val bookingRef = bookingsCollection.document(booking.id)
+            val fresh = transaction.get(bookingRef)
+            val status = fresh.getString("bookingStatus")
+            if (!fresh.exists() || fresh.getString("userId") != userId) throw Exception("Booking not found.")
+            if (status !in ACTIVE_STATUSES) throw Exception("This booking is already ${status?.lowercase() ?: "closed"}.")
+
+            val lockSnaps = buckets.map { transaction.get(slotLocksCollection.document(lockId(booking.parkingId, booking.spotNumber, it))) }
             val availRef = availabilityCollection.document(booking.parkingId)
             val availSnapshot = transaction.get(availRef)
 
@@ -238,13 +246,21 @@ class BookingRepository {
                 bookingRef,
                 mapOf("bookingStatus" to BookingStatus.CANCELLED.name, "updatedAt" to Timestamp.now())
             )
+            // Only this booking's locks; older bookings made before locks existed have none.
+            lockSnaps.filter { it.exists() && it.getString("bookingId") == booking.id }
+                .forEach { transaction.delete(it.reference) }
             if (availSnapshot.exists()) {
                 val field = availabilityField(booking.vehicleType)
-                val updates = mutableMapOf<String, Any>(field to FieldValue.increment(1), "lastUpdated" to Timestamp.now())
+                val updates = mutableMapOf<String, Any>(
+                    field to (availSnapshot.getLong(field) ?: 0) + 1,
+                    "lastUpdated" to Timestamp.now(),
+                    "lastBookingId" to booking.id
+                )
                 @Suppress("UNCHECKED_CAST")
                 val floorAvail = (availSnapshot.get("floorAvailability") as? Map<String, Long>)
-                if (floorAvail?.containsKey(booking.floorNumber.toString()) == true) {
-                    updates["floorAvailability.${booking.floorNumber}"] = FieldValue.increment(1)
+                val floorKey = booking.floorNumber.toString()
+                if (floorAvail?.containsKey(floorKey) == true) {
+                    updates["floorAvailability"] = floorAvail.toMutableMap().apply { put(floorKey, (get(floorKey) ?: 0) + 1) }
                 }
                 transaction.update(availRef, updates)
             }
@@ -252,19 +268,40 @@ class BookingRepository {
         Unit
     }
 
-    /** Adds [hours] to a booking's end time and price. */
+    /** Adds [hours] to an active booking, only if the bay is free for the extra time. */
     suspend fun extendBooking(booking: Booking, hours: Int, ratePerHour: Double, taxRate: Double): Result<Booking> = runCatching {
-        val newExit = Timestamp(Date(booking.exitTime.toDate().time + hours * 3_600_000L))
+        val userId = auth.currentUser?.uid ?: throw Exception("You're signed out. Log in and try again.")
+        val oldExit = booking.exitTime.toDate().time
+        val newExitMs = oldExit + hours * 3_600_000L
+        val held = lockBuckets(booking.entryTime.toDate().time, oldExit).toSet()
+        val extra = lockBuckets(oldExit, newExitMs).filter { it !in held }
         val extraBase = ratePerHour * hours
         val updated = booking.copy(
-            exitTime = newExit,
+            exitTime = Timestamp(Date(newExitMs)),
             durationHours = booking.durationHours + hours,
             basePrice = booking.basePrice + extraBase,
             taxAmount = booking.taxAmount + extraBase * taxRate,
             totalPrice = booking.totalPrice + extraBase * (1 + taxRate),
             updatedAt = Timestamp.now()
         )
-        bookingsCollection.document(booking.id).set(updated).await()
+        try {
+            firestore.runTransaction { transaction ->
+                val bookingRef = bookingsCollection.document(booking.id)
+                val fresh = transaction.get(bookingRef)
+                if (!fresh.exists() || fresh.getString("userId") != userId) throw Exception("Booking not found.")
+                if (fresh.getString("bookingStatus") !in ACTIVE_STATUSES) throw Exception("Only active bookings can be extended.")
+                val lockRefs = extra.map { slotLocksCollection.document(lockId(booking.parkingId, booking.spotNumber, it)) }
+                if (lockRefs.any { transaction.get(it).exists() }) {
+                    throw Exception("Spot ${booking.spotNumber} is booked by someone else right after your slot, so it can't be extended.")
+                }
+                transaction.set(bookingRef, updated)
+                extra.zip(lockRefs).forEach { (bucket, ref) ->
+                    transaction.set(ref, lockData(booking.parkingId, booking.spotNumber, bucket, booking.id, userId))
+                }
+            }.await()
+        } catch (e: Exception) {
+            throw e.toBookingError()
+        }
         updated
     }
 
@@ -274,7 +311,55 @@ class BookingRepository {
         VehicleType.HEAVY -> "availableSpotsHeavy"
     }
 
+    private fun lockData(parkingId: String, spotNumber: String, bucket: Long, bookingId: String, userId: String) = mapOf(
+        "parkingId" to parkingId,
+        "spotNumber" to spotNumber,
+        "bucket" to bucket,
+        "bookingId" to bookingId,
+        "userId" to userId,
+        // For a future TTL policy that clears old locks.
+        "expiresAt" to Timestamp(Date((bucket + 1) * LOCK_BUCKET_MS))
+    )
+
+    class SlotTakenException(spotNumber: String) :
+        Exception("Spot $spotNumber was just booked for that time. Pick another spot.")
+
+    /** Turns raw Firestore failures into messages a driver can act on. Never reports success. */
+    private fun Exception.toBookingError(): Exception {
+        val chain = generateSequence<Throwable>(this) { it.cause }.toList()
+        chain.firstOrNull { it is SlotTakenException }?.let { return it as Exception }
+        return when (chain.filterIsInstance<FirebaseFirestoreException>().firstOrNull()?.code) {
+            FirebaseFirestoreException.Code.UNAVAILABLE, FirebaseFirestoreException.Code.DEADLINE_EXCEEDED ->
+                Exception("You're offline, so nothing was booked. Check your connection and try again.")
+            FirebaseFirestoreException.Code.PERMISSION_DENIED ->
+                Exception("This booking was refused. Refresh and try again.")
+            FirebaseFirestoreException.Code.ABORTED ->
+                Exception("Someone booked at the same moment. Pick the spot again.")
+            else -> Exception(
+                chain.firstOrNull { it !is FirebaseFirestoreException && !it.message.isNullOrBlank() }?.message
+                    ?: "Couldn't complete the booking. Try again."
+            )
+        }
+    }
+
     companion object {
+        const val SLOT_LOCKS = "slot_locks"
+        /** Bays are locked in 30-minute buckets; check-in times are on the half hour. */
+        const val LOCK_BUCKET_MS = 30 * 60_000L
+        val ACTIVE_STATUSES = setOf(BookingStatus.PENDING.name, BookingStatus.CONFIRMED.name, BookingStatus.ACTIVE.name)
+
+        fun bucketOf(timeMs: Long): Long = Math.floorDiv(timeMs, LOCK_BUCKET_MS)
+
+        /** Every bucket the interval touches, rounding outwards so partial buckets are held too. */
+        fun lockBuckets(entryMs: Long, exitMs: Long): List<Long> {
+            if (exitMs <= entryMs) return emptyList()
+            val first = bucketOf(entryMs)
+            val last = Math.floorDiv(exitMs - 1, LOCK_BUCKET_MS)
+            return (first..last).toList()
+        }
+
+        fun lockId(parkingId: String, spotNumber: String, bucket: Long) = "${parkingId}_${spotNumber}_$bucket"
+
         /** Short, readable label for a floor number: B2, B1, G, L1, L2… */
         fun floorLabel(floorNumber: Int): String = when {
             floorNumber < 0 -> "B${-floorNumber}"
