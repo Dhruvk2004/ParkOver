@@ -5,15 +5,13 @@ import { test, before, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { BUCKET_MS, HOUR, bucketOf, lockId, lockData, futureStart, createBooking, cancelBooking, extendBooking, countField } from './booking.js';
 import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where,
   runTransaction, Timestamp,
 } from 'firebase/firestore';
 
-const BUCKET_MS = 30 * 60_000;
-const HOUR = 3_600_000;
 const PARKING = 'p1';
-const ACTIVE = ['PENDING', 'CONFIRMED', 'ACTIVE'];
 
 let env;
 
@@ -49,108 +47,7 @@ const db = (uid) => {
 let anonDb;
 const anon = () => (anonDb ??= env.unauthenticatedContext().firestore());
 
-// ---- Copies of BookingRepository.kt ----
 
-const bucketOf = (ms) => Math.floor(ms / BUCKET_MS);
-function lockBuckets(entryMs, exitMs) {
-  if (exitMs <= entryMs) return [];
-  const out = [];
-  for (let b = bucketOf(entryMs); b <= Math.floor((exitMs - 1) / BUCKET_MS); b++) out.push(b);
-  return out;
-}
-const lockId = (parkingId, spot, bucket) => `${parkingId}_${spot}_${bucket}`;
-const lockData = (parkingId, spotNumber, bucket, bookingId, userId) => ({
-  parkingId, spotNumber, bucket, bookingId, userId,
-  expiresAt: Timestamp.fromMillis((bucket + 1) * BUCKET_MS),
-});
-let idCounter = 0;
-const newBookingId = () => `PK-TEST-${++idCounter}-${Date.now() % 100000}`;
-
-function futureStart(hoursAhead = 2) {
-  return (bucketOf(Date.now()) + hoursAhead * 2) * BUCKET_MS; // on a half hour, in the future
-}
-
-async function createBooking(fs, uid, { spot = 'L1-01', floor = 1, type = 'FOUR_WHEELER', start = futureStart(), hours = 2 } = {}) {
-  const id = newBookingId();
-  const entry = start, exit = start + hours * HOUR;
-  const booking = {
-    id, userId: uid, parkingId: PARKING, spotNumber: spot, floorNumber: floor, floorName: 'Level 1',
-    vehicleType: type, entryTime: Timestamp.fromMillis(entry), exitTime: Timestamp.fromMillis(exit),
-    durationHours: hours, bookingStatus: 'CONFIRMED', createdAt: Timestamp.now(), updatedAt: Timestamp.now(),
-  };
-  const buckets = lockBuckets(entry, exit);
-  await runTransaction(fs, async (tx) => {
-    const lockRefs = buckets.map((b) => doc(fs, 'slot_locks', lockId(PARKING, spot, b)));
-    for (const ref of lockRefs) {
-      if ((await tx.get(ref)).exists()) throw new Error(`Spot ${spot} was just booked for that time.`);
-    }
-    const availRef = doc(fs, 'parking_availability', PARKING);
-    const avail = await tx.get(availRef);
-    const updates = {};
-    if (avail.exists()) {
-      const field = countField(type);
-      const current = avail.get(field) ?? 0;
-      if (current <= 0) throw new Error('This parking is full for your vehicle type.');
-      updates[field] = current - 1;
-      const floors = avail.get('floorAvailability');
-      if (floors && String(floor) in floors) {
-        if (floors[String(floor)] <= 0) throw new Error('Floor full');
-        updates.floorAvailability = { ...floors, [String(floor)]: floors[String(floor)] - 1 };
-      }
-      updates.lastUpdated = Timestamp.now();
-      updates.lastBookingId = id;
-    }
-    tx.set(doc(fs, 'bookings', id), booking);
-    buckets.forEach((b, i) => tx.set(lockRefs[i], lockData(PARKING, spot, b, id, uid)));
-    if (Object.keys(updates).length) tx.update(availRef, updates);
-  });
-  return booking;
-}
-
-async function cancelBooking(fs, uid, booking) {
-  const buckets = lockBuckets(booking.entryTime.toMillis(), booking.exitTime.toMillis());
-  await runTransaction(fs, async (tx) => {
-    const bookingRef = doc(fs, 'bookings', booking.id);
-    const fresh = await tx.get(bookingRef);
-    if (!fresh.exists() || fresh.get('userId') !== uid) throw new Error('Booking not found.');
-    if (!ACTIVE.includes(fresh.get('bookingStatus'))) throw new Error('This booking is already closed.');
-    const lockSnaps = [];
-    for (const b of buckets) lockSnaps.push(await tx.get(doc(fs, 'slot_locks', lockId(PARKING, booking.spotNumber, b))));
-    const availRef = doc(fs, 'parking_availability', PARKING);
-    const avail = await tx.get(availRef);
-    tx.update(bookingRef, { bookingStatus: 'CANCELLED', updatedAt: Timestamp.now() });
-    lockSnaps.filter((s) => s.exists() && s.get('bookingId') === booking.id).forEach((s) => tx.delete(s.ref));
-    if (avail.exists()) {
-      const field = countField(booking.vehicleType);
-      const updates = { [field]: (avail.get(field) ?? 0) + 1, lastUpdated: Timestamp.now(), lastBookingId: booking.id };
-      const floors = avail.get('floorAvailability');
-      const key = String(booking.floorNumber);
-      if (floors && key in floors) updates.floorAvailability = { ...floors, [key]: floors[key] + 1 };
-      tx.update(availRef, updates);
-    }
-  });
-}
-
-async function extendBooking(fs, uid, booking, hours) {
-  const oldExit = booking.exitTime.toMillis();
-  const newExit = oldExit + hours * HOUR;
-  const held = new Set(lockBuckets(booking.entryTime.toMillis(), oldExit));
-  const extra = lockBuckets(oldExit, newExit).filter((b) => !held.has(b));
-  await runTransaction(fs, async (tx) => {
-    const ref = doc(fs, 'bookings', booking.id);
-    const fresh = await tx.get(ref);
-    if (!fresh.exists() || fresh.get('userId') !== uid) throw new Error('Booking not found.');
-    if (!ACTIVE.includes(fresh.get('bookingStatus'))) throw new Error('Only active bookings can be extended.');
-    const lockRefs = extra.map((b) => doc(fs, 'slot_locks', lockId(PARKING, booking.spotNumber, b)));
-    for (const r of lockRefs) if ((await tx.get(r)).exists()) throw new Error('Spot taken after your slot.');
-    tx.set(ref, { ...booking, exitTime: Timestamp.fromMillis(newExit), durationHours: booking.durationHours + hours, updatedAt: Timestamp.now() });
-    extra.forEach((b, i) => tx.set(lockRefs[i], lockData(PARKING, booking.spotNumber, b, booking.id, uid)));
-  });
-}
-
-function countField(t) {
-  return t === 'TWO_WHEELER' ? 'availableSpotsTwoWheeler' : t === 'HEAVY' ? 'availableSpotsHeavy' : 'availableSpotsFourWheeler';
-}
 
 async function availability() {
   let data;

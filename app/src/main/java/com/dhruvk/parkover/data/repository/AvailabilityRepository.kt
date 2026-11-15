@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import com.google.firebase.firestore.MetadataChanges
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
 
@@ -31,23 +32,22 @@ class AvailabilityRepository {
         awaitClose { listener.remove() }
     }
     
-    // Real-time listener for all spots' availability
-    fun getAllAvailabilityRealtime(): Flow<Map<String, ParkingAvailability>> = callbackFlow {
-        val listener = availabilityCollection.addSnapshotListener { snapshot, error ->
-            if (error != null) {
-                trySend(emptyMap())
+    /**
+     * Live counts for every parking. [fromServer] is false while the data only comes from the
+     * local cache, which may be incomplete, so never decide "this parking has no doc" from it.
+     */
+    fun observeAllAvailability(): Flow<AvailabilitySnapshot> = callbackFlow {
+        // INCLUDE metadata so we also hear when the cached data is confirmed by the server.
+        val listener = availabilityCollection.addSnapshotListener(MetadataChanges.INCLUDE) { snapshot, error ->
+            if (error != null || snapshot == null) {
+                trySend(AvailabilitySnapshot(emptyMap(), emptySet(), fromServer = false))
                 return@addSnapshotListener
             }
-            
-            val availabilityMap = mutableMapOf<String, ParkingAvailability>()
-            snapshot?.documents?.forEach { doc ->
-                doc.toObject(ParkingAvailability::class.java)?.let {
-                    availabilityMap[it.spotId] = it
-                }
-            }
-            trySend(availabilityMap)
+            val byParking = snapshot.documents.mapNotNull { doc ->
+                doc.toObject(ParkingAvailability::class.java)?.let { it.spotId.ifBlank { doc.id } to it }
+            }.toMap()
+            trySend(AvailabilitySnapshot(byParking, snapshot.documents.map { it.id }.toSet(), !snapshot.metadata.isFromCache))
         }
-        
         awaitClose { listener.remove() }
     }
     
@@ -96,21 +96,12 @@ class AvailabilityRepository {
         }
     }
     
-    // Check if availability exists for spots
-    suspend fun checkAndInitializeAvailability(spots: List<ParkingSpot>) {
-        try {
-            val existingDocs = availabilityCollection.get().await()
-            val existingIds = existingDocs.documents.map { it.id }.toSet()
-            
-            val missingSpots = spots.filter { it.id !in existingIds }
-            if (missingSpots.isNotEmpty()) {
-                initializeAllAvailability(missingSpots)
-            }
-        } catch (e: Exception) {
-            // Log error
-        }
+    /** Creates live-count docs for parkings that don't have one yet ([knownIds] from a server snapshot). */
+    suspend fun seedMissing(spots: List<ParkingSpot>, knownIds: Set<String>) {
+        val missing = spots.filter { it.id !in knownIds }
+        if (missing.isNotEmpty()) initializeAllAvailability(missing)
     }
-    
+
     companion object {
         @Volatile
         private var INSTANCE: AvailabilityRepository? = null
@@ -122,3 +113,9 @@ class AvailabilityRepository {
         }
     }
 }
+
+data class AvailabilitySnapshot(
+    val byParking: Map<String, ParkingAvailability>,
+    val docIds: Set<String>,
+    val fromServer: Boolean
+)

@@ -8,6 +8,8 @@ Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fake
 
 **Phase 4 done:** 5 E2E smoke tests on the Nothing A015 against the **live dev project** (`parkover-b042b`): real network, GPS, ORS routing, Photon search and rules. Each test uses brand-new throwaway accounts (`e2e-<random>@parkover.test`, random password generated at runtime) and cleans up: bookings cancelled (bays and counts restored), vehicles/profile/accounts deleted; cancelled booking docs stay because the rules forbid deleting bookings. Covered: AUTH-07, AUTH-13, LOC-01 (real permission prompt), ROUTE-01, SRCH-01, BOOK-01, BKL-04, SPOT-04/LOAD-07 (another driver books, my screen updates live), NET-02/BOOK-09 (real Wi-Fi + data off). Bug found and fixed: a search typed before the parking list loaded never showed our own parkings.
 
+**Phase 5 done:** load and cost. Emulator scenarios (`npm run load` in `firestore-tests/`) run the app's own booking writes under the real rules; a capped live burst (`npm run load:live`) measures the real project. Results and the cost model are in §8. Bugs found and fixed: under a rush, drivers going for a *different free* bay were refused because the free count was written from a stale read (now `increment(±1)`, plus a re-run when refused); cancel/extend used the on-screen copy of a booking, so cancelling an extended booking left the extra hour's bays locked forever, and two quick extends reported a clash with themselves (both now read the stored booking inside the transaction); every app open read all live counts twice and saved parkings twice (≈47% fewer reads now).
+
 ---
 
 ## 1. Principles
@@ -353,8 +355,10 @@ scripts/run-e2e.sh 001206477020888            # both suites
 scripts/run-e2e.sh 001206477020888 first      # first launch only
 scripts/run-e2e.sh 001206477020888 smoke      # smoke only
 
-# Layer 4 (to build)
-# k6 run load/book-last-spot.js
+# Layer 4: load (needs Java 21 for the emulator)
+cd firestore-tests && npm run load                  # all emulator scenarios
+cd firestore-tests && SCENARIO=rush npm run load    # one: rush | sustained | fanout | storm
+cd firestore-tests && npm run load:live             # capped burst on the live dev project
 ```
 
 ### Writing a device test
@@ -369,3 +373,45 @@ scripts/run-e2e.sh 001206477020888 smoke      # smoke only
   frames under a Compose test (it then never navigates).
 - When a touch can land on a moving layout (keyboard closing), click with
   `performSemanticsAction(SemanticsActions.OnClick)`.
+
+---
+
+## 8. Load results and cost model (Phase 5, 15 Nov 2026)
+
+### Emulator (real rules, the app's booking code; `npm run load`)
+| Scenario | Load | Result |
+|---|---|---|
+| LOAD-01 last-spot rush | 50 drivers, 2 free bays, same instant | ✅ both bays booked once; 48 told "just booked" or "full"; never negative |
+| LOAD-02 sustained churn | 100 drivers × 20 parkings, 45 s, ~70k ops (book / extend / cancel) | ✅ no bay double-booked, counts == capacity − active, every active booking holds its locks, no orphan locks |
+| LOAD-03 fan-out | 300 phones watching one parking | ✅ all 300 saw a booking within ~225 ms |
+| LOAD-04 storm | 30 bookings × (3 cancels + 2 extends) at once | ✅ exactly 30 cancels, extends add up, counts back to capacity, no orphan locks |
+
+### Live dev project (`npm run load:live`, ~400 ops, Govandi, 7 days ahead, all cancelled)
+| Measure | p50 | p95 |
+|---|---|---|
+| Book (20 at once on one parking) | 73 ms | 2.6 s |
+| Cancel (21 at once) | 1.3 s | 2.9 s |
+| 5-way race for one bay | 0.76 s | 1.06 s → exactly 1 winner, 4 × "just booked" |
+
+Counts went 40 → 20 → 40 (floor 104 → 84 → 104); the 5 throwaway accounts were deleted.
+
+### Firestore reads per cold app open (signed-in driver)
+With 104 parkings, S saved, B bookings, U UPI IDs, V vehicles:
+
+| | Formula | Typical (S=3, B=10, U=1, V=2) |
+|---|---|---|
+| Before Phase 5 | 2 × 104 + 2S + B + U + V | ≈ 228 reads |
+| Now | 104 + S + B + U + V | ≈ 120 reads |
+
+- **Spark free tier (50,000 reads/day):** ≈ 416 opens/day now (was ≈ 219) → roughly **140 daily drivers** at 3 opens each.
+- **Live updates:** each phone listens to **all** parkings, so every booking/cancel anywhere costs one read *per online phone*. 50 phones online × 500 changes/day ≈ 25,000 reads/day. Before launch, listen only to parkings near the map view.
+- **Bookings list** grows forever (B); limit it to recent/upcoming.
+- **Writes:** a 2 h booking = 6 writes (booking + 4 locks + count); cancel = 2 writes + 4 deletes. Spark's 20,000 writes/day ≈ 3,000 bookings/day.
+
+### Routing quota (OpenRouteService free: 2,000 routes + 500 matrix calls/day)
+One route per pin tap or search pick, one matrix call per Saved tab open, no caching. At ~10 taps per driver per day that's **~200 drivers/day**. Before launch: cache routes (spot × origin rounded to ~200 m, ~10 min) behind the planned proxy (risk 5).
+
+### Design findings (not fixed here)
+1. **"Free now" isn't time-aware.** A booking for next week lowers today's free count (the live burst showed Govandi at 20 free while all bookings were 7 days ahead). Count only bookings active now (e.g. from the current slot locks) or decrement at check-in.
+2. **One hot document per parking.** Every booking at a parking updates one availability doc; simultaneous bookings queue (p95 ≈ 2.6–2.9 s for 20 at once). Fine for normal use; for event-day spikes use sharded counters or a server-side aggregator.
+

@@ -64,8 +64,9 @@ class ParkingViewModel : ViewModel() {
                 is ApiResult.Success -> {
                     staticParkingSpots = result.data
                     Log.d(TAG, "Loaded ${result.data.size} parking spots from API")
-                    if (source.seedsAvailability) availabilityRepository.checkAndInitializeAvailability(result.data)
+                    seedsAvailability = source.seedsAvailability
                     mergeWithAvailability()
+                    seedMissingIfReady()
                 }
                 is ApiResult.Error -> {
                     Log.e(TAG, "Failed to load parking spots: ${result.message}")
@@ -78,11 +79,26 @@ class ParkingViewModel : ViewModel() {
 
     private fun observeAvailability() {
         viewModelScope.launch {
-            availabilityRepository.getAllAvailabilityRealtime().collectLatest { availMap ->
-                _availabilityMap.value = availMap
+            availabilityRepository.observeAllAvailability().collectLatest { snap ->
+                _availabilityMap.value = snap.byParking
+                if (snap.fromServer) serverDocIds = snap.docIds
                 mergeWithAvailability()
+                seedMissingIfReady()
             }
         }
+    }
+
+    // Seeding uses the live listener's first server snapshot instead of re-reading the whole
+    // collection on every launch (that cost one read per parking, every time the app opened).
+    private var serverDocIds: Set<String>? = null
+    private var seedsAvailability = false
+    private var seeded = false
+
+    private fun seedMissingIfReady() {
+        val known = serverDocIds ?: return
+        if (seeded || !seedsAvailability || staticParkingSpots.isEmpty()) return
+        seeded = true
+        viewModelScope.launch { runCatching { availabilityRepository.seedMissing(staticParkingSpots, known) } }
     }
 
     private fun mergeWithAvailability() {

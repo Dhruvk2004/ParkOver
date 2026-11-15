@@ -32,8 +32,9 @@ class AccountViewModel : ViewModel() {
     val savedParkings: StateFlow<List<SavedParking>?> = accountRepository.observeSavedParkings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-    val savedIds: StateFlow<Set<String>> = accountRepository.observeSavedParkings()
-        .map { list -> list.map { it.parkingId }.toSet() }
+    // Derived from the one saved-parkings listener (a second listener doubled the reads).
+    val savedIds: StateFlow<Set<String>> = savedParkings
+        .map { list -> list.orEmpty().map { it.parkingId }.toSet() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /** null while the first snapshot is loading. */

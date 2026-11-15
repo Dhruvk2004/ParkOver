@@ -75,8 +75,8 @@ class FakeLocation(
 }
 
 class FakeParkingSource(
-    var result: ApiResult<List<ParkingSpot>> = ApiResult.Success(listOf(TestPlaces.SPOT_A, TestPlaces.SPOT_B))
+    var result: ApiResult<List<ParkingSpot>> = ApiResult.Success(listOf(TestPlaces.SPOT_A, TestPlaces.SPOT_B)),
+    override val seedsAvailability: Boolean = false
 ) : ParkingSource {
     override suspend fun getParkingSpots() = result
-    override val seedsAvailability = false
 }
