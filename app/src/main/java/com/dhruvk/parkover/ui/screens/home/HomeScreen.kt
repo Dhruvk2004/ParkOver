@@ -239,11 +239,13 @@ fun HomeScreen(
     val latestSpots by rememberUpdatedState(allSpots)
     val latestCentre by rememberUpdatedState(centre)
     LaunchedEffect(Unit) {
-        snapshotFlow { searchQuery }
+        // Re-run when the parking list arrives too, so a query typed before it loaded still
+        // finds our own parkings.
+        snapshotFlow { searchQuery to latestSpots.size }
             .debounce(350)
             .distinctUntilChanged()
-            .filter { it.length >= 2 && destination?.first != it }
-            .collect { query ->
+            .filter { (q, _) -> q.length >= 2 && destination?.first != q }
+            .collect { (query, _) ->
                 val ownSpots = latestSpots
                     .filter { it.name.contains(query, ignoreCase = true) || it.address.contains(query, ignoreCase = true) }
                     .take(3)

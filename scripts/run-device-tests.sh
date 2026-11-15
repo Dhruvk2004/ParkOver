@@ -52,11 +52,13 @@ trap restore_login EXIT
 "${ADB[@]}" reverse tcp:9099 tcp:9099 >/dev/null
 
 INSTRUMENT="adb -s $SERIAL shell am instrument -w -r"
-if [[ -n "$TARGET" ]]; then
-  last="${TARGET##*.}"
-  # com.x.home → package; com.x.home.HomeRouteTest or …#method → class
-  if [[ "$TARGET" != *"#"* && "${last:0:1}" =~ [a-z] ]]; then INSTRUMENT="$INSTRUMENT -e package $TARGET"
-  else INSTRUMENT="$INSTRUMENT -e class $TARGET"; fi
+last="${TARGET##*.}"
+if [[ -z "$TARGET" ]]; then
+  INSTRUMENT="$INSTRUMENT -e notPackage $PKG.e2e" # E2E runs live, via run-e2e.sh
+elif [[ "$TARGET" != *"#"* && "${last:0:1}" =~ [a-z] ]]; then
+  INSTRUMENT="$INSTRUMENT -e package $TARGET"     # com.x.home → package
+else
+  INSTRUMENT="$INSTRUMENT -e class $TARGET"       # com.x.home.HomeRouteTest or …#method
 fi
 INSTRUMENT="$INSTRUMENT $PKG.test/$PKG.testing.ParkOverTestRunner > '$OUT/instrument.txt'"
 

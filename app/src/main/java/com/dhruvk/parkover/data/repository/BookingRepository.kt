@@ -21,10 +21,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import java.util.UUID
 
-class BookingRepository {
-
-    private val firestore = FirebaseFirestore.getInstance()
-    private val auth = FirebaseAuth.getInstance()
+/** [firestore]/[auth] are the app's defaults; E2E tests pass a second Firebase app to act as another driver. */
+class BookingRepository(
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+) {
 
     private val bookingsCollection = firestore.collection("bookings")
     private val vehiclesCollection = firestore.collection("vehicles")

@@ -6,6 +6,8 @@ Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fake
 
 **Phase 3 done:** 22 on-device tests on the Nothing A015, run against the **local Firebase emulator** (Firestore + Auth, real rules) over USB, so they never touch `parkover-b042b`. The runner saves and restores the phone's real login. Covered: MAP-03/06, ROUTE-01/02/03/04/07/08, SRCH-01/03/04/06, FLT-04, SPOT-02, LOC-06, BOOK-01/06/07/08/09/10, BKL-04, AUTH-01/03/04. Bugs found and fixed: Firestore held an offline booking and **committed it when the connection came back** (BOOK-09; now fails fast with "nothing was booked"); a failing place search crashed Home (SRCH-06); own parkings waited for the slower place search.
 
+**Phase 4 done:** 5 E2E smoke tests on the Nothing A015 against the **live dev project** (`parkover-b042b`): real network, GPS, ORS routing, Photon search and rules. Each test uses brand-new throwaway accounts (`e2e-<random>@parkover.test`, random password generated at runtime) and cleans up: bookings cancelled (bays and counts restored), vehicles/profile/accounts deleted; cancelled booking docs stay because the rules forbid deleting bookings. Covered: AUTH-07, AUTH-13, LOC-01 (real permission prompt), ROUTE-01, SRCH-01, BOOK-01, BKL-04, SPOT-04/LOAD-07 (another driver books, my screen updates live), NET-02/BOOK-09 (real Wi-Fi + data off). Bug found and fixed: a search typed before the parking list loaded never showed our own parkings.
+
 ---
 
 ## 1. Principles
@@ -346,8 +348,13 @@ scripts/run-device-tests.sh 001206477020888 com.dhruvk.parkover.home.HomeRouteTe
 # Firestore rules + booking race (needs Java 21, e.g. Android Studio's bundled JBR)
 cd firestore-tests && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" npm test
 
-# Layer 3 / 4 (to build)
-# scripts/run-e2e.sh <serial>, k6 run load/book-last-spot.js
+# Layer 3: E2E smoke on the live dev project (saves/restores your login, Wi-Fi, data, permission)
+scripts/run-e2e.sh 001206477020888            # both suites
+scripts/run-e2e.sh 001206477020888 first      # first launch only
+scripts/run-e2e.sh 001206477020888 smoke      # smoke only
+
+# Layer 4 (to build)
+# k6 run load/book-last-spot.js
 ```
 
 ### Writing a device test
@@ -358,3 +365,7 @@ cd firestore-tests && JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/C
 - Tests that write data use `AppTestRule(resetBackend = true)` (wipes the emulator) and
   `TestBackend.seed/list` to plant or inspect documents as an admin (e.g. another driver's lock).
 - Simulate Firestore offline with `TestBackend.firestore().disableNetwork()`; always re-enable in `finally`.
+- Around system dialogs, use `compose.pumpUntil { … }`: a plain UIAutomator wait stops the app drawing
+  frames under a Compose test (it then never navigates).
+- When a touch can land on a moving layout (keyboard closing), click with
+  `performSemanticsAction(SemanticsActions.OnClick)`.
