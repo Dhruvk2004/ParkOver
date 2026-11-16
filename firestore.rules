@@ -76,50 +76,59 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // Live free-spot counts. Public read: the app shows them before sign-in.
+    // Legacy single counters (one number per parking, not time-aware). Read-only now; occupancy
+    // below replaced them.
     match /parking_availability/{parkingId} {
       allow read: if true;
-
-      // Seeded by the app the first time a parking is seen. Counts can't be negative.
-      allow create: if signedIn()
-                    && request.resource.data.availableSpotsTwoWheeler >= 0
-                    && request.resource.data.availableSpotsFourWheeler >= 0
-                    && request.resource.data.availableSpotsHeavy >= 0;
-
-      // Every change is exactly -1 for a booking created in the same write, or +1 for one
-      // cancelled in the same write, for that booking's own vehicle type and floor.
-      allow update: if signedIn() && validCountChange(parkingId);
+      allow write: if false;
     }
 
-    function countField(vehicleType) {
-      return vehicleType == 'TWO_WHEELER' ? 'availableSpotsTwoWheeler'
-           : (vehicleType == 'HEAVY' ? 'availableSpotsHeavy' : 'availableSpotsFourWheeler');
+    // How many bays are booked per parking, per 30-minute slot: occupancy/{parkingId}_{bucket}
+    // with a count per vehicle type (TWO_WHEELER, FOUR_WHEELER, HEAVY) and per floor.
+    // "Free now" = capacity - this half-hour's counts, so future bookings don't change today.
+    // Public read (shown before sign-in; no personal data).
+    match /occupancy/{docId} {
+      allow read: if true;
+      allow create, update: if signedIn() && validOccupancyChange(docId);
+      allow delete: if false;
     }
 
-    function validCountChange(parkingId) {
-      let bookingId = request.resource.data.lastBookingId;
-      let ref = docPath('bookings', bookingId);
+    // A slot's count moves by exactly +1 (booking created, or extended into this slot) or -1
+    // (booking cancelled), for that booking's own type and floor, only inside its stay, never < 0.
+    function validOccupancyChange(docId) {
+      let d = request.resource.data;
+      let ref = docPath('bookings', d.lastBookingId);
       let after = getAfter(ref).data;
-      let field = countField(after.vehicleType);
-      let created = !exists(ref) && isActive(after.bookingStatus);
-      let cancelled = exists(ref) && isActive(get(ref).data.bookingStatus) && after.bookingStatus == 'CANCELLED';
-      let delta = created ? -1 : 1;
-      return after.parkingId == parkingId
-          && after.userId == request.auth.uid
-          && (created || cancelled)
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly([field, 'floorAvailability', 'lastUpdated', 'lastBookingId'])
-          && request.resource.data[field] == resource.data[field] + delta
-          && request.resource.data[field] >= 0
-          && validFloorChange(string(after.floorNumber), delta);
+      let existed = exists(ref);
+      return after.userId == request.auth.uid
+          && d.parkingId == after.parkingId
+          && d.bucket is int
+          && docId == after.parkingId + '_' + string(d.bucket)
+          && validSlotChange(d, resource == null ? {} : resource.data, after, existed ? get(ref).data : after, existed);
     }
 
-    function validFloorChange(floorKey, delta) {
-      let before = resource.data.get('floorAvailability', {});
-      let now = request.resource.data.get('floorAvailability', {});
-      return now.diff(before).affectedKeys().hasOnly([floorKey])
-          && (!(floorKey in before)
-              || (now.get(floorKey, 0) == before[floorKey] + delta && now.get(floorKey, 0) >= 0));
+    // (Split from validOccupancyChange: rules allow at most 10 variables per function.)
+    function validSlotChange(d, old, after, before, existed) {
+      let created = !existed && isActive(after.bookingStatus);
+      let cancelled = existed && isActive(before.bookingStatus) && after.bookingStatus == 'CANCELLED';
+      let extended = existed && isActive(before.bookingStatus) && isActive(after.bookingStatus)
+                     && after.exitTime > before.exitTime;
+      let delta = cancelled ? -1 : 1;
+      let type = after.vehicleType;
+      let first = extended ? lastBucketOf(before.exitTime) + 1 : bucketOf(after.entryTime);
+      let last = cancelled ? lastBucketOf(before.exitTime) : lastBucketOf(after.exitTime);
+      return (created || cancelled || extended)
+          && d.bucket >= first && d.bucket <= last
+          && d.diff(old).affectedKeys().hasOnly([type, 'floors', 'lastBookingId', 'lastUpdated', 'parkingId', 'bucket'])
+          && d.get(type, 0) == old.get(type, 0) + delta
+          && d.get(type, 0) >= 0
+          && validFloorDelta(old.get('floors', {}), d.get('floors', {}), string(after.floorNumber), delta);
+    }
+
+    function validFloorDelta(before, now, key, delta) {
+      return now.diff(before).affectedKeys().hasOnly([key])
+          && now.get(key, 0) == before.get(key, 0) + delta
+          && now.get(key, 0) >= 0;
     }
 
     // Support requests: users can file one, nobody can read them back from the app.

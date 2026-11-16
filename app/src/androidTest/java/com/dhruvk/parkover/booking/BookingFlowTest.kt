@@ -103,6 +103,9 @@ class BookingFlowTest {
         assertEquals("G-02", booking["spotNumber"])
         assertEquals(66.0, (booking["totalPrice"] as Number).toDouble(), 0.001) // ₹30 × 2 h + 10%
         assertEquals("2 h stay holds four 30-minute locks", 4, locks().count { it["bookingId"] == booking["_id"] })
+        val occupancy = TestBackend.list("occupancy")
+        assertEquals("one occupancy doc per slot of the stay", 4, occupancy.size)
+        assertTrue(occupancy.all { it["FOUR_WHEELER"] == 1L && (it["floors"] as Map<*, *>)["0"] == 1L })
     }
 
     @Test
@@ -139,9 +142,13 @@ class BookingFlowTest {
     @Test
     fun BOOK_08_parkingFillsUpMidFlow_bookingRefused() {
         goToPayment()
-        TestBackend.seed("parking_availability/${spot.id}", mapOf(
-            "spotId" to spot.id, "availableSpotsTwoWheeler" to 5, "availableSpotsFourWheeler" to 0,
-            "availableSpotsHeavy" to 0, "floorAvailability" to mapOf("0" to 0)))
+        // Every car bay is booked during the chosen time (by other drivers, at that time only).
+        val first = BookingRepository.bucketOf(System.currentTimeMillis())
+        (first..first + 8).forEach { b ->
+            TestBackend.seed("occupancy/${BookingRepository.occupancyId(spot.id, b)}", mapOf(
+                "parkingId" to spot.id, "bucket" to b, "FOUR_WHEELER" to spot.totalSpotsFourWheeler,
+                "floors" to mapOf("0" to spot.totalSpotsFourWheeler), "lastBookingId" to "PK-OTHER"))
+        }
         confirm()
         compose.waitFor(hasText("full", substring = true), timeoutMs = 20_000)
         assertTrue(bookings().isEmpty())
@@ -186,6 +193,7 @@ class BookingFlowTest {
 
         compose.waitUntil(15_000) { bookings().singleOrNull()?.get("bookingStatus") == "CANCELLED" }
         compose.waitUntil(10_000) { locks().isEmpty() }
+        assertTrue("cancel gives every slot back", TestBackend.list("occupancy").all { it["FOUR_WHEELER"] == 0L })
         compose.waitFor(hasText("Past · 1"))
     }
 }

@@ -15,6 +15,8 @@ import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Transaction
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -22,6 +24,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Date
 import java.util.UUID
+
+/** Bays a slot can hold: for one vehicle type, and (optionally) on one floor. */
+data class SlotCapacity(val type: Int, val floor: Int? = null)
 
 /** [firestore]/[auth] are the app's defaults; E2E tests pass a second Firebase app to act as another driver. */
 class BookingRepository(
@@ -31,7 +36,7 @@ class BookingRepository(
 
     private val bookingsCollection = firestore.collection("bookings")
     private val vehiclesCollection = firestore.collection("vehicles")
-    private val availabilityCollection = firestore.collection("parking_availability")
+    private val occupancyCollection = firestore.collection(OCCUPANCY)
     private val slotLocksCollection = firestore.collection(SLOT_LOCKS)
 
     // ---------- Vehicles ----------
@@ -85,22 +90,21 @@ class BookingRepository(
     // ---------- Floors and spots ----------
 
     /**
-     * Builds the floor plan for [spot] from its own floor list (real names, including basements).
-     * Bays booked in Firestore are marked taken; the rest of the occupancy comes from the live
-     * per-floor availability count.
+     * Floor plan for [spot] during the stay [fromMs]..[toMs]: a bay is taken if someone holds
+     * its lock in any 30-minute slot of that window (from the public slot locks; other drivers'
+     * bookings stay private). Bookings at other times don't block it.
+     * Display only: the booking transaction is what actually stops double bookings.
      */
-    suspend fun getFloorsWithSpots(spot: ParkingSpot, vehicleType: VehicleType): List<FloorData> {
+    suspend fun getFloorsWithSpots(spot: ParkingSpot, vehicleType: VehicleType, fromMs: Long, toMs: Long): List<FloorData> {
         if (spot.floors.isEmpty()) return emptyList()
-        // Bays held from now on, from the slot locks (other users' bookings are private).
-        // This is display only: the booking transaction is what actually stops double bookings.
-        val nowBucket = bucketOf(AppServices.clock.nowMillis())
+        val window = lockBuckets(fromMs, toMs).let { if (it.isEmpty()) setOf(bucketOf(fromMs)) else it.toSet() }
         val booked = try {
             slotLocksCollection
                 .whereEqualTo("parkingId", spot.id)
                 .get()
                 .await()
                 .documents
-                .filter { (it.getLong("bucket") ?: Long.MIN_VALUE) >= nowBucket }
+                .filter { it.getLong("bucket") in window }
                 .mapNotNull { it.getString("spotNumber") }
                 .toSet()
         } catch (e: Exception) {
@@ -109,12 +113,9 @@ class BookingRepository(
 
         return spot.floors.sortedBy { it.floorNumber }.map { floor ->
             val prefix = floorLabel(floor.floorNumber)
-            val occupied = (floor.totalSpots - floor.availableSpots).coerceIn(0, floor.totalSpots)
             val slots = (0 until floor.totalSpots).map { index ->
                 val spotNumber = "$prefix-${String.format("%02d", index + 1)}"
-                // Spread the counted occupancy across the floor instead of filling it front to back
-                val takenByCount = floor.totalSpots > 0 && ((index * 37) % floor.totalSpots) < occupied
-                val taken = spotNumber in booked || takenByCount
+                val taken = spotNumber in booked
                 ParkingSlot(
                     id = "${spot.id}_${floor.floorNumber}_$spotNumber",
                     spotNumber = spotNumber,
@@ -141,14 +142,16 @@ class BookingRepository(
     // ---------- Bookings ----------
 
     /**
-     * Creates the booking, its slot locks and the availability decrement in one transaction.
+     * Creates the booking, its bay locks and +1 occupancy for every 30-minute slot of the stay,
+     * in one transaction.
      *
-     * Each 30-minute bucket of a bay has one lock document. Reading the locks inside the
-     * transaction makes two people booking the same bay and time collide: Firestore retries the
-     * loser, which then sees the winner's lock and fails with a clear message. Any error fails the
-     * booking (never "assume it's free").
+     * Bay locks (one per bay per slot) stop two drivers taking the same bay at the same time:
+     * Firestore retries the loser, which then sees the winner's lock. Occupancy counts per slot
+     * make "free now" and "full" time-aware: a booking for next week never changes today.
+     * [capacity] (the parking's bays for this vehicle type, and on this floor) refuses slots
+     * that are already full. Any error fails the booking (never "assume it's free").
      */
-    suspend fun createBooking(booking: Booking): Result<Booking> {
+    suspend fun createBooking(booking: Booking, capacity: SlotCapacity? = null): Result<Booking> {
         val userId = auth.currentUser?.uid ?: return Result.failure(Exception("You're signed out. Log in and try again."))
 
         BookingRules.timeProblem(booking.entryTime.toDate().time, booking.exitTime.toDate().time, AppServices.clock.nowMillis())
@@ -163,36 +166,32 @@ class BookingRepository(
             updatedAt = Timestamp.now()
         )
         val buckets = lockBuckets(booking.entryTime.toDate().time, booking.exitTime.toDate().time)
+        val type = booking.vehicleType.name
+        val floorKey = booking.floorNumber.toString()
 
         return try {
-            requireServer(availabilityCollection.document(booking.parkingId)) // public, readable before booking
+            requireServer(occupancyCollection.document(occupancyId(booking.parkingId, buckets.first()))) // public read
             retryIfRefused { firestore.runTransaction { transaction ->
                 // All reads first (Firestore requires reads before writes).
                 val lockRefs = buckets.map { slotLocksCollection.document(lockId(booking.parkingId, booking.spotNumber, it)) }
                 if (lockRefs.any { transaction.get(it).exists() }) throw SlotTakenException(booking.spotNumber)
-                val availRef = availabilityCollection.document(booking.parkingId)
-                val availSnapshot = transaction.get(availRef)
-
-                var countUpdate: List<Any>? = null
-                if (availSnapshot.exists()) {
-                    val field = availabilityField(booking.vehicleType)
-                    if ((availSnapshot.getLong(field) ?: 0) <= 0) throw Exception("This parking is full for your vehicle type.")
-                    @Suppress("UNCHECKED_CAST")
-                    val floorAvail = availSnapshot.get("floorAvailability") as? Map<String, Long>
-                    val floorKey = booking.floorNumber.toString()
-                    val tracksFloor = floorAvail?.containsKey(floorKey) == true
-                    if (tracksFloor && (floorAvail!![floorKey] ?: 0) <= 0) throw Exception("${booking.floorName} is full. Pick another floor.")
-                    // increment(-1), not "value read minus one": two drivers booking different bays
-                    // at once must both succeed. The rules still allow exactly -1, never below 0,
-                    // and only for a booking created in this same write (lastBookingId).
-                    countUpdate = countChange(field, floorKey.takeIf { tracksFloor }, -1, bookingId)
+                val occSnaps = buckets.map { transaction.get(occupancyCollection.document(occupancyId(booking.parkingId, it))) }
+                if (capacity != null) {
+                    if (occSnaps.any { occupiedCount(it, type) >= capacity.type }) {
+                        throw Exception("This parking is full for your vehicle type at that time. Try another time.")
+                    }
+                    if (capacity.floor != null && occSnaps.any { occupiedFloor(it, floorKey) >= capacity.floor }) {
+                        throw Exception("${booking.floorName} is full at that time. Pick another floor or time.")
+                    }
                 }
 
                 transaction.set(bookingsCollection.document(bookingId), newBooking)
                 buckets.zip(lockRefs).forEach { (bucket, ref) ->
                     transaction.set(ref, lockData(booking.parkingId, booking.spotNumber, bucket, bookingId, userId))
                 }
-                countUpdate?.let { applyCountChange(transaction, availRef, it) }
+                buckets.zip(occSnaps).forEach { (bucket, snap) ->
+                    writeOccupancy(transaction, snap, booking.parkingId, bucket, type, floorKey, +1, bookingId)
+                }
             }.await() }
             Result.success(newBooking)
         } catch (e: Exception) {
@@ -228,9 +227,9 @@ class BookingRepository(
     }
 
     /**
-     * Cancels an active booking, frees its slot locks and gives the bay back, once.
-     * Everything is computed from the booking as stored now (inside the transaction), not from
-     * the copy on screen, which may be stale (e.g. extended on another phone).
+     * Cancels an active booking, frees its bay locks and gives back -1 occupancy for each slot,
+     * once. Everything comes from the booking as stored now (inside the transaction), not the
+     * copy on screen, which may be stale (e.g. extended on another phone).
      */
     suspend fun cancelBooking(booking: Booking): Result<Unit> = runCatching {
         val userId = auth.currentUser?.uid ?: throw Exception("You're signed out. Log in and try again.")
@@ -243,23 +242,21 @@ class BookingRepository(
                 if (!fresh.exists() || fresh.getString("userId") != userId) throw Exception("Booking not found.")
                 if (status !in ACTIVE_STATUSES) throw Exception("This booking is already ${status?.lowercase() ?: "closed"}.")
                 val current = fresh.toObject(Booking::class.java)!!
+                val type = current.vehicleType.name
+                val floorKey = current.floorNumber.toString()
 
                 val buckets = lockBuckets(current.entryTime.toDate().time, current.exitTime.toDate().time)
                 val lockSnaps = buckets.map { transaction.get(slotLocksCollection.document(lockId(current.parkingId, current.spotNumber, it))) }
-                val availRef = availabilityCollection.document(current.parkingId)
-                val availSnapshot = transaction.get(availRef)
+                val occSnaps = buckets.map { transaction.get(occupancyCollection.document(occupancyId(current.parkingId, it))) }
 
                 transaction.update(bookingRef, mapOf("bookingStatus" to BookingStatus.CANCELLED.name, "updatedAt" to Timestamp.now()))
                 // Only this booking's locks; older bookings made before locks existed have none.
                 lockSnaps.filter { it.exists() && it.getString("bookingId") == current.id }
                     .forEach { transaction.delete(it.reference) }
-                if (availSnapshot.exists()) {
-                    @Suppress("UNCHECKED_CAST")
-                    val floorAvail = availSnapshot.get("floorAvailability") as? Map<String, Long>
-                    val floorKey = current.floorNumber.toString()
-                    val change = countChange(availabilityField(current.vehicleType), floorKey.takeIf { floorAvail?.containsKey(it) == true }, +1, current.id)
-                    applyCountChange(transaction, availRef, change)
-                }
+                // Bookings made before occupancy existed have nothing to give back: skip empty slots.
+                buckets.zip(occSnaps)
+                    .filter { (_, snap) -> occupiedCount(snap, type) > 0 && occupiedFloor(snap, floorKey) > 0 }
+                    .forEach { (bucket, snap) -> writeOccupancy(transaction, snap, current.parkingId, bucket, type, floorKey, -1, current.id) }
             }.await() }
         } catch (e: Exception) {
             throw BookingRules.errorFor(e)
@@ -268,10 +265,13 @@ class BookingRepository(
     }
 
     /**
-     * Adds [hours] to an active booking, only if the bay is free for the extra time. Uses the
-     * stored end time, so two quick extends add up instead of colliding with each other.
+     * Adds [hours] to an active booking, only if the bay (and, with [capacity], the parking) is
+     * free for the extra time. Uses the stored end time, so two quick extends add up instead of
+     * colliding with each other.
      */
-    suspend fun extendBooking(booking: Booking, hours: Int, ratePerHour: Double, taxRate: Double): Result<Booking> = runCatching {
+    suspend fun extendBooking(
+        booking: Booking, hours: Int, ratePerHour: Double, taxRate: Double, capacity: SlotCapacity? = null
+    ): Result<Booking> = runCatching {
         val userId = auth.currentUser?.uid ?: throw Exception("You're signed out. Log in and try again.")
         val bookingRef = bookingsCollection.document(booking.id)
         try {
@@ -281,16 +281,21 @@ class BookingRepository(
                 if (!fresh.exists() || fresh.getString("userId") != userId) throw Exception("Booking not found.")
                 if (fresh.getString("bookingStatus") !in ACTIVE_STATUSES) throw Exception("Only active bookings can be extended.")
                 val current = fresh.toObject(Booking::class.java)!!
+                val type = current.vehicleType.name
+                val floorKey = current.floorNumber.toString()
                 val oldExit = current.exitTime.toDate().time
                 val newExitMs = oldExit + hours * 3_600_000L
                 val held = lockBuckets(current.entryTime.toDate().time, oldExit).toSet()
                 val extra = lockBuckets(oldExit, newExitMs).filter { it !in held }
-                val lockRefs = extra.map { slotLocksCollection.document(lockId(current.parkingId, current.spotNumber, it)) }
-                val lockSnaps = lockRefs.map { transaction.get(it) }
+                val lockSnaps = extra.map { transaction.get(slotLocksCollection.document(lockId(current.parkingId, current.spotNumber, it))) }
                 // A lock of this same booking (from a quick second extend) isn't a clash; the commit
                 // check will retry us with fresh data. Only someone else's lock is.
                 if (lockSnaps.any { it.exists() && it.getString("bookingId") != current.id }) {
                     throw Exception("Spot ${current.spotNumber} is booked by someone else right after your slot, so it can't be extended.")
+                }
+                val occSnaps = extra.map { transaction.get(occupancyCollection.document(occupancyId(current.parkingId, it))) }
+                if (capacity != null && occSnaps.any { occupiedCount(it, type) >= capacity.type }) {
+                    throw Exception("This parking is full for your vehicle type then, so it can't be extended.")
                 }
                 val extraBase = ratePerHour * hours
                 val updated = current.copy(
@@ -302,8 +307,9 @@ class BookingRepository(
                     updatedAt = Timestamp.now()
                 )
                 transaction.set(bookingRef, updated)
-                extra.zip(lockSnaps).filterNot { (_, snap) -> snap.exists() }.forEach { (bucket, snap) ->
-                    transaction.set(snap.reference, lockData(current.parkingId, current.spotNumber, bucket, current.id, userId))
+                extra.indices.filterNot { lockSnaps[it].exists() }.forEach { i ->
+                    transaction.set(lockSnaps[i].reference, lockData(current.parkingId, current.spotNumber, extra[i], current.id, userId))
+                    writeOccupancy(transaction, occSnaps[i], current.parkingId, extra[i], type, floorKey, +1, current.id)
                 }
                 updated
             }.await() }
@@ -312,10 +318,36 @@ class BookingRepository(
         }
     }
 
-    private fun availabilityField(type: VehicleType) = when (type) {
-        VehicleType.TWO_WHEELER -> "availableSpotsTwoWheeler"
-        VehicleType.FOUR_WHEELER -> "availableSpotsFourWheeler"
-        VehicleType.HEAVY -> "availableSpotsHeavy"
+    // ---------- Occupancy ----------
+
+    private fun occupiedCount(snap: DocumentSnapshot, type: String): Long = if (snap.exists()) snap.getLong(type) ?: 0 else 0
+
+    private fun occupiedFloor(snap: DocumentSnapshot, floorKey: String): Long =
+        if (snap.exists()) (snap.get(FieldPath.of("floors", floorKey)) as? Number)?.toLong() ?: 0 else 0
+
+    /** +1/-1 on one slot for one booking (its type and floor), creating the slot doc if needed. */
+    private fun writeOccupancy(
+        transaction: Transaction, snap: DocumentSnapshot, parkingId: String, bucket: Long,
+        type: String, floorKey: String, delta: Long, bookingId: String
+    ) {
+        if (snap.exists()) {
+            transaction.update(
+                snap.reference,
+                FieldPath.of(type), FieldValue.increment(delta),
+                FieldPath.of("floors", floorKey), FieldValue.increment(delta),
+                FieldPath.of("lastBookingId"), bookingId,
+                FieldPath.of("lastUpdated"), Timestamp.now()
+            )
+        } else {
+            transaction.set(snap.reference, mapOf(
+                "parkingId" to parkingId,
+                "bucket" to bucket,
+                type to delta,
+                "floors" to mapOf(floorKey to delta),
+                "lastBookingId" to bookingId,
+                "lastUpdated" to Timestamp.now()
+            ))
+        }
     }
 
     /**
@@ -332,22 +364,6 @@ class BookingRepository(
             if (e is FirebaseFirestoreException && e.code != FirebaseFirestoreException.Code.UNAVAILABLE) throw e
             throw offline
         }
-    }
-
-    /** Field/value pairs for a ±1 change of a parking's free counts, tied to [bookingId]. */
-    private fun countChange(field: String, floorKey: String?, delta: Long, bookingId: String): List<Any> = buildList {
-        add(FieldPath.of(field)); add(FieldValue.increment(delta))
-        if (floorKey != null) { add(FieldPath.of("floorAvailability", floorKey)); add(FieldValue.increment(delta)) }
-        add(FieldPath.of("lastUpdated")); add(Timestamp.now())
-        add(FieldPath.of("lastBookingId")); add(bookingId)
-    }
-
-    private fun applyCountChange(
-        transaction: com.google.firebase.firestore.Transaction,
-        ref: com.google.firebase.firestore.DocumentReference,
-        pairs: List<Any>
-    ) {
-        transaction.update(ref, pairs[0] as FieldPath, pairs[1], *pairs.drop(2).toTypedArray())
     }
 
     /**
@@ -383,6 +399,7 @@ class BookingRepository(
 
     companion object {
         const val SLOT_LOCKS = "slot_locks"
+        const val OCCUPANCY = "occupancy"
         /** Bays are locked in 30-minute buckets; check-in times are on the half hour. */
         const val LOCK_BUCKET_MS = 30 * 60_000L
         /** How long to wait for the server before saying "you're offline". */
@@ -400,6 +417,8 @@ class BookingRepository(
         }
 
         fun lockId(parkingId: String, spotNumber: String, bucket: Long) = "${parkingId}_${spotNumber}_$bucket"
+
+        fun occupancyId(parkingId: String, bucket: Long) = "${parkingId}_$bucket"
 
         /** Short, readable label for a floor number: B2, B1, G, L1, L2… */
         fun floorLabel(floorNumber: Int): String = when {

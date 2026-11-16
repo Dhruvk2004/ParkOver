@@ -71,7 +71,6 @@ class E2eSmokeTest {
 
     @Test
     fun E2E_03_bookAndCancel_liveBackend_restoresTheBay() {
-        val before = govandiFreeCars()
         compose.openGovandiDetails()
         val bay = compose.fromDetailsToPayment()
         compose.confirmBooking()
@@ -80,7 +79,10 @@ class E2eSmokeTest {
         val booking = myBookings().single()
         assertEquals("CONFIRMED", booking["bookingStatus"])
         assertEquals(bay, booking["spotNumber"])
-        assertEquals(before - 1, govandiFreeCars())
+        val slots = BookingRepository.lockBuckets(
+            (booking["entryTime"] as Timestamp).toDate().time, (booking["exitTime"] as Timestamp).toDate().time)
+        val before = slots.associateWith { govandiCarsInSlot(it) }
+        assertTrue("each slot of the stay counts this car", before.values.all { it >= 1 })
         assertEquals(4, locksFor(booking["_id"] as String))
 
         compose.onNodeWithText("My bookings").performClick()
@@ -89,32 +91,41 @@ class E2eSmokeTest {
         compose.waitFor(hasText("Keep it"))
         compose.onAllNodesWithText("Cancel booking").onLast().performClick()
         compose.waitUntil(NET_MS) { myBookings().single()["bookingStatus"] == "CANCELLED" }
-        assertEquals(before, govandiFreeCars())
+        slots.forEach { assertEquals("slot $it given back", before.getValue(it) - 1, govandiCarsInSlot(it)) }
         assertEquals(0, locksFor(booking["_id"] as String))
     }
 
     @Test
-    fun E2E_04_anotherDriverBooks_myScreenUpdatesLive() {
+    fun E2E_04_anotherDriverBooks_freeNowCountsOnlyCarsParkedNow() {
         compose.openGovandiDetails()
         compose.waitUntil(NET_MS) { freeNowOnScreen() != null }
         val shown = freeNowOnScreen()!!
 
-        // Driver B, a separate signed-in client, books a car bay through the app's own booking code.
+        // Driver B, a separate signed-in client, books through the app's own booking code.
         val b = e2e.otherDriver()
         val repoB = BookingRepository(FirebaseFirestore.getInstance(b), FirebaseAuth.getInstance(b))
-        val start = BookingRules.nextHalfHour(System.currentTimeMillis()) + 3 * BookingRules.HOUR_MS
-        val booked = runBlocking {
+        fun book(start: Long, bay: String) = runBlocking {
             repoB.createBooking(Booking(
                 parkingId = Govandi.ID, parkingName = Govandi.NAME, vehicleType = VehicleType.FOUR_WHEELER,
-                floorNumber = 0, floorName = "Ground Level", spotNumber = "G-99", vehicleNumber = "MH01ZZ0002",
+                floorNumber = 0, floorName = "Ground Level", spotNumber = bay, vehicleNumber = "MH01ZZ0002",
                 entryTime = Timestamp(Date(start)), exitTime = Timestamp(Date(start + BookingRules.HOUR_MS)),
                 durationHours = 1, bookingStatus = BookingStatus.CONFIRMED
             ))
         }.getOrThrow()
 
+        // Tomorrow: today's "free now" must not move.
+        val tomorrow = book(BookingRules.nextHalfHour(System.currentTimeMillis()) + 24 * BookingRules.HOUR_MS, "G-98")
+        Thread.sleep(6_000)
+        assertEquals("a booking for tomorrow must not lower today's count", shown, freeNowOnScreen())
+
+        // Parked right now (stay started at the top of this half hour): count drops live.
+        val nowStart = BookingRepository.bucketOf(System.currentTimeMillis()) * BookingRepository.LOCK_BUCKET_MS
+        val parkedNow = book(nowStart, "G-99")
         compose.waitUntil(15_000) { freeNowOnScreen() == shown - 1 }
-        runBlocking { repoB.cancelBooking(booked) }.getOrThrow()
+
+        runBlocking { repoB.cancelBooking(parkedNow) }.getOrThrow()
         compose.waitUntil(15_000) { freeNowOnScreen() == shown }
+        runBlocking { repoB.cancelBooking(tomorrow) }.getOrThrow()
     }
 
     @Test

@@ -79,11 +79,11 @@ fun myBookings(): List<Map<String, Any?>> =
     Tasks.await(db().collection("bookings").whereEqualTo("userId", uid()).get(), NET_MS, TimeUnit.MILLISECONDS)
         .documents.map { it.data.orEmpty() + ("_id" to it.id) }
 
-/** Free car bays at Govandi right now, read from the server. */
-fun govandiFreeCars(): Long =
-    Tasks.await(db().collection("parking_availability").document(Govandi.ID)
+/** Cars booked at Govandi in one 30-minute slot, read from the server (0 when no doc). */
+fun govandiCarsInSlot(bucket: Long): Long =
+    Tasks.await(db().collection("occupancy").document(com.dhruvk.parkover.data.repository.BookingRepository.occupancyId(Govandi.ID, bucket))
         .get(com.google.firebase.firestore.Source.SERVER), NET_MS, TimeUnit.MILLISECONDS)
-        .getLong("availableSpotsFourWheeler") ?: error("No live availability for ${Govandi.ID}")
+        .getLong("FOUR_WHEELER") ?: 0
 
 fun locksFor(bookingId: String): Int =
     Tasks.await(db().collection("slot_locks").whereEqualTo("parkingId", Govandi.ID).get(), NET_MS, TimeUnit.MILLISECONDS)

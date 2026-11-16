@@ -10,6 +10,8 @@ Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fake
 
 **Phase 5 done:** load and cost. Emulator scenarios (`npm run load` in `firestore-tests/`) run the app's own booking writes under the real rules; a capped live burst (`npm run load:live`) measures the real project. Results and the cost model are in §8. Bugs found and fixed: under a rush, drivers going for a *different free* bay were refused because the free count was written from a stale read (now `increment(±1)`, plus a re-run when refused); cancel/extend used the on-screen copy of a booking, so cancelling an extended booking left the extra hour's bays locked forever, and two quick extends reported a clash with themselves (both now read the stored booking inside the transaction); every app open read all live counts twice and saved parkings twice (≈47% fewer reads now).
 
+**Free-now fix (after Phase 5):** a booking used to lower one per-parking counter the moment it was made, whatever its date. Now each booking adds +1 to `occupancy/{parkingId}_{slot}` for every 30-minute slot of its stay (per vehicle type and floor), and "free now" = capacity − the current slot's count. "Full" is time-aware too (full at 10:00 doesn't block 14:00), and the floor plan shows bays taken during the chosen time only. The old `parking_availability` counters are read-only. Rules still allow only ±1 tied to a booking created, cancelled or extended in the same write, inside its stay, never below 0. Load test: the same 45 s churn now books 8,042 times instead of 322.
+
 ---
 
 ## 1. Principles
@@ -395,23 +397,27 @@ cd firestore-tests && npm run load:live             # capped burst on the live d
 
 Counts went 40 → 20 → 40 (floor 104 → 84 → 104); the 5 throwaway accounts were deleted.
 
-### Firestore reads per cold app open (signed-in driver)
-With 104 parkings, S saved, B bookings, U UPI IDs, V vehicles:
+After the free-now fix (16 Nov, occupancy per slot): the 20 bookings 7 days ahead raised those slots to 40 and back to 0, while **the current slot stayed at 0 throughout**; race still exactly 1 winner. Book p50 0.9 s / p95 3.5 s, cancel p50 1.4 s / p95 6.0 s (21 at once): each booking now also updates its slots' occupancy docs, and drivers booking the same times contend on them.
 
-| | Formula | Typical (S=3, B=10, U=1, V=2) |
+### Firestore reads per cold app open (signed-in driver)
+With 104 parkings, N parkings with someone parked this half hour, S saved, B bookings, U UPI IDs, V vehicles:
+
+| | Formula | Typical (N=5, S=3, B=10, U=1, V=2) |
 |---|---|---|
 | Before Phase 5 | 2 × 104 + 2S + B + U + V | ≈ 228 reads |
-| Now | 104 + S + B + U + V | ≈ 120 reads |
+| After Phase 5 | 104 + S + B + U + V | ≈ 120 reads |
+| After the free-now fix | N + S + B + U + V (+1 per :00/:30 slot change) | ≈ 21 reads |
 
-- **Spark free tier (50,000 reads/day):** ≈ 416 opens/day now (was ≈ 219) → roughly **140 daily drivers** at 3 opens each.
-- **Live updates:** each phone listens to **all** parkings, so every booking/cancel anywhere costs one read *per online phone*. 50 phones online × 500 changes/day ≈ 25,000 reads/day. Before launch, listen only to parkings near the map view.
+- **Spark free tier (50,000 reads/day):** ≈ 2,400 opens/day at N=5 → roughly **800 daily drivers** at 3 opens each (N grows with how busy the city is right now).
+- **Live updates:** phones listen only to the current slot, so a booking for later costs no reads on other phones; only stays covering "now" (and their cancels) reach every online phone. Listening only to parkings near the map view is still the next step at city scale.
 - **Bookings list** grows forever (B); limit it to recent/upcoming.
 - **Writes:** a 2 h booking = 6 writes (booking + 4 locks + count); cancel = 2 writes + 4 deletes. Spark's 20,000 writes/day ≈ 3,000 bookings/day.
 
 ### Routing quota (OpenRouteService free: 2,000 routes + 500 matrix calls/day)
 One route per pin tap or search pick, one matrix call per Saved tab open, no caching. At ~10 taps per driver per day that's **~200 drivers/day**. Before launch: cache routes (spot × origin rounded to ~200 m, ~10 min) behind the planned proxy (risk 5).
 
-### Design findings (not fixed here)
-1. **"Free now" isn't time-aware.** A booking for next week lowers today's free count (the live burst showed Govandi at 20 free while all bookings were 7 days ahead). Count only bookings active now (e.g. from the current slot locks) or decrement at check-in.
-2. **One hot document per parking.** Every booking at a parking updates one availability doc; simultaneous bookings queue (p95 ≈ 2.6–2.9 s for 20 at once). Fine for normal use; for event-day spikes use sharded counters or a server-side aggregator.
+### Design findings
+1. ~~**"Free now" isn't time-aware.**~~ **Fixed** with per-slot occupancy (see the status note at the top).
+2. **One hot document per parking slot.** Simultaneous bookings for the *same parking and time* still update the same occupancy doc and queue (p95 ≈ 2.6–2.9 s for 20 at once); bookings at different times no longer contend. For event-day spikes use sharded counters or a server-side aggregator.
+3. **Per-type capacity is enforced by the app, not the rules.** Rules guarantee bays can't be double-booked and counts move by ±1 only, but they don't know each parking's capacity (it lives in the parking JSON). A modified client could book more cars than car bays (each on a distinct bay). Move capacity into Firestore (or a server) before launch.
 

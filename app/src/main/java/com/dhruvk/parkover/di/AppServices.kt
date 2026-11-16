@@ -34,8 +34,6 @@ interface LocationProvider {
 /** The list of parkings. */
 interface ParkingSource {
     suspend fun getParkingSpots(): ApiResult<List<ParkingSpot>>
-    /** Whether the app should create live-availability docs for these parkings. Fakes say no. */
-    val seedsAvailability: Boolean get() = true
 }
 
 fun interface Clock {

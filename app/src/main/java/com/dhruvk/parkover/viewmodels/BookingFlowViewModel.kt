@@ -2,6 +2,7 @@ package com.dhruvk.parkover.viewmodels
 
 import com.dhruvk.parkover.di.AppServices
 import com.dhruvk.parkover.domain.BookingRules
+import com.dhruvk.parkover.domain.FreeNow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.model.Booking
@@ -126,7 +127,9 @@ class BookingFlowViewModel : ViewModel() {
         val spot = _spot.value ?: return
         viewModelScope.launch {
             _floorsLoading.value = true
-            _floors.value = repository.getFloorsWithSpots(spot, _bookingData.value.vehicleType)
+            val data = _bookingData.value
+            // Bays taken during this booking's time window (bookings at other times don't block).
+            _floors.value = repository.getFloorsWithSpots(spot, data.vehicleType, data.checkInTime, data.checkOutTime)
             _floorsLoading.value = false
         }
     }
@@ -210,7 +213,8 @@ class BookingFlowViewModel : ViewModel() {
                 paymentStatus = PaymentStatus.PENDING,
                 bookingStatus = BookingStatus.CONFIRMED
             )
-            _submitState.value = repository.createBooking(booking).fold(
+            val capacity = FreeNow.capacityFor(_spot.value, current.vehicleType, current.floorNumber)
+            _submitState.value = repository.createBooking(booking, capacity).fold(
                 onSuccess = { SubmitState.Done(it.id) },
                 onFailure = { SubmitState.Error(it.message ?: "Couldn't create the booking. Try again.") }
             )

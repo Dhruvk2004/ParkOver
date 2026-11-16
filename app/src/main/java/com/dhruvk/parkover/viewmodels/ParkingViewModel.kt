@@ -5,11 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dhruvk.parkover.data.api.PresetVehicleApi
 import com.dhruvk.parkover.data.api.VehiclesResponse
-import com.dhruvk.parkover.data.model.ParkingAvailability
 import com.dhruvk.parkover.data.model.ParkingSpot
 import com.dhruvk.parkover.data.model.VehicleType
 import com.dhruvk.parkover.data.repository.ApiResult
-import com.dhruvk.parkover.data.repository.AvailabilityRepository
+import com.dhruvk.parkover.data.repository.OccupancyRepository
+import com.dhruvk.parkover.data.repository.SlotOccupancy
+import com.dhruvk.parkover.domain.FreeNow
 import com.dhruvk.parkover.data.repository.ParkingRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,7 +23,7 @@ private const val TAG = "ParkingViewModel"
 class ParkingViewModel : ViewModel() {
 
     private val parkingRepository = ParkingRepository.getInstance()
-    private val availabilityRepository = AvailabilityRepository.getInstance()
+    private val occupancyRepository = OccupancyRepository()
 
     // Raw parking spots from GitHub (static data)
     private var staticParkingSpots: List<ParkingSpot> = emptyList()
@@ -32,8 +33,8 @@ class ParkingViewModel : ViewModel() {
     val parkingSpots: StateFlow<ApiResult<List<ParkingSpot>>> = _parkingSpots.asStateFlow()
 
     // Real-time availability map
-    private val _availabilityMap = MutableStateFlow<Map<String, ParkingAvailability>>(emptyMap())
-    val availabilityMap: StateFlow<Map<String, ParkingAvailability>> = _availabilityMap.asStateFlow()
+    /** Bays booked in the current 30-minute slot, per parking. */
+    private val _occupiedNow = MutableStateFlow<Map<String, SlotOccupancy>>(emptyMap())
 
     // Vehicles Data
     private val _vehiclesData = MutableStateFlow<ApiResult<VehiclesResponse>>(ApiResult.Loading)
@@ -64,9 +65,7 @@ class ParkingViewModel : ViewModel() {
                 is ApiResult.Success -> {
                     staticParkingSpots = result.data
                     Log.d(TAG, "Loaded ${result.data.size} parking spots from API")
-                    seedsAvailability = source.seedsAvailability
                     mergeWithAvailability()
-                    seedMissingIfReady()
                 }
                 is ApiResult.Error -> {
                     Log.e(TAG, "Failed to load parking spots: ${result.message}")
@@ -79,49 +78,17 @@ class ParkingViewModel : ViewModel() {
 
     private fun observeAvailability() {
         viewModelScope.launch {
-            availabilityRepository.observeAllAvailability().collectLatest { snap ->
-                _availabilityMap.value = snap.byParking
-                if (snap.fromServer) serverDocIds = snap.docIds
+            occupancyRepository.observeNow().collectLatest { occupied ->
+                _occupiedNow.value = occupied
                 mergeWithAvailability()
-                seedMissingIfReady()
             }
         }
     }
 
-    // Seeding uses the live listener's first server snapshot instead of re-reading the whole
-    // collection on every launch (that cost one read per parking, every time the app opened).
-    private var serverDocIds: Set<String>? = null
-    private var seedsAvailability = false
-    private var seeded = false
-
-    private fun seedMissingIfReady() {
-        val known = serverDocIds ?: return
-        if (seeded || !seedsAvailability || staticParkingSpots.isEmpty()) return
-        seeded = true
-        viewModelScope.launch { runCatching { availabilityRepository.seedMissing(staticParkingSpots, known) } }
-    }
-
+    /** Free now = capacity - bays booked in the current slot (future bookings don't count). */
     private fun mergeWithAvailability() {
         if (staticParkingSpots.isEmpty()) return
-
-        val availMap = _availabilityMap.value
-        val mergedSpots = staticParkingSpots.map { spot ->
-            val availability = availMap[spot.id]
-            if (availability != null) {
-                spot.copy(
-                    availableSpotsTwoWheeler = availability.availableSpotsTwoWheeler,
-                    availableSpotsFourWheeler = availability.availableSpotsFourWheeler,
-                    availableSpotsHeavy = availability.availableSpotsHeavy,
-                    floors = spot.floors.map { floor ->
-                        val floorAvail = availability.floorAvailability[floor.floorNumber.toString()]
-                        floor.copy(availableSpots = floorAvail ?: floor.totalSpots)
-                    }
-                )
-            } else {
-                spot
-            }
-        }
-        _parkingSpots.value = ApiResult.Success(mergedSpots)
+        _parkingSpots.value = ApiResult.Success(FreeNow.apply(staticParkingSpots, _occupiedNow.value))
     }
 
     fun loadVehiclesData() {
