@@ -12,6 +12,8 @@ Status (14 Nov): **Phase 0 done.** Test libraries, `AppServices` seams with fake
 
 **Free-now fix (after Phase 5):** a booking used to lower one per-parking counter the moment it was made, whatever its date. Now each booking adds +1 to `occupancy/{parkingId}_{slot}` for every 30-minute slot of its stay (per vehicle type and floor), and "free now" = capacity − the current slot's count. "Full" is time-aware too (full at 10:00 doesn't block 14:00), and the floor plan shows bays taken during the chosen time only. The old `parking_availability` counters are read-only. Rules still allow only ±1 tied to a booking created, cancelled or extended in the same write, inside its stay, never below 0. Load test: the same 45 s churn now books 8,042 times instead of 322.
 
+**P0 gaps closed (17 Nov):** every P0 scenario now has a test. New: VEH-01/04, BOOK-02, SPOT-08, AUTH-02, LIFE-05 on the emulator (31 device tests) and NET-01/02/03, AUTH-11, LOC-02/05 on the live project (11 E2E tests; `run-e2e.sh` also resets Android's "don't ask again" so the location prompt is real, and restores the location setting). Bugs found and fixed: two quick "Make default" taps left two default vehicles (now one atomic batch); with location switched off in system settings the app spun "Finding your location…" forever (now detects it, says "Location off", and the locate button opens Android's location settings); after a failed route, tapping the same pin never retried; the floor plan could spin forever on a slow read (now capped at 8 s, display only).
+
 ---
 
 ## 1. Principles

@@ -28,7 +28,13 @@ import java.util.concurrent.TimeUnit
  * counts go back), deletes their vehicles and profile data, then deletes the accounts.
  * Cancelled booking documents remain: the rules forbid deleting bookings.
  */
-class E2eRule(private val signIn: Boolean = true) : TestWatcher() {
+class E2eRule(
+    private val signIn: Boolean = true,
+    /** Create the account, then sign out before the app starts (for login tests). */
+    private val accountButSignedOut: Boolean = false,
+    /** Run just before the app starts, e.g. network or GPS off. */
+    private val beforeLaunch: () -> Unit = {}
+) : TestWatcher() {
 
     val accounts = mutableListOf<Pair<FirebaseApp, String>>()
     lateinit var email: String; private set
@@ -40,10 +46,16 @@ class E2eRule(private val signIn: Boolean = true) : TestWatcher() {
         FirebaseAuth.getInstance().signOut()
         email = newEmail()
         password = newPassword()
-        if (signIn) createAccount(FirebaseApp.getInstance(), email, password)
+        if (signIn || accountButSignedOut) createAccount(FirebaseApp.getInstance(), email, password)
+        if (accountButSignedOut) FirebaseAuth.getInstance().signOut()
+        beforeLaunch()
     }
 
     override fun finished(description: Description) {
+        runCatching { setNetwork(true) }
+        runCatching { setLocationEnabled(true) }
+        // Signed out at the end (e.g. a login test that failed)? Sign back in so cleanup can delete.
+        if (FirebaseAuth.getInstance().currentUser == null && accounts.isNotEmpty()) runCatching { signBackIn() }
         // Clean up every account this test made, including ones created through the UI.
         FirebaseAuth.getInstance().currentUser?.let { u -> if (accounts.none { it.second == u.uid }) accounts += FirebaseApp.getInstance() to u.uid }
         accounts.forEach { (app, _) -> runCatching { cleanUp(app) } }
@@ -111,6 +123,22 @@ class E2eRule(private val signIn: Boolean = true) : TestWatcher() {
             val v = if (on) "enable" else "disable"
             shell("svc wifi $v")
             shell("svc data $v")
+        }
+
+        /** Location (GPS) on/off in system settings. */
+        fun setLocationEnabled(on: Boolean) {
+            shell("cmd location set-location-enabled $on")
+        }
+
+        /** Taps "Don't allow" if Android asks for location. Returns whether it asked. */
+        fun denyLocationIfAsked(timeoutMs: Long = 4_000): Boolean {
+            val d = device()
+            val button = d.wait(Until.findObject(By.res("com.android.permissioncontroller:id/permission_deny_button")), timeoutMs)
+                ?: d.findObject(By.textContains("Don't allow"))
+                ?: d.findObject(By.textContains("Don’t allow"))
+                ?: return false
+            button.click()
+            return true
         }
 
         /** Taps "While using the app" if Android asks for location. Returns whether it asked. */

@@ -154,6 +154,7 @@ fun HomeScreen(
     val spotsResult = parkingViewModel.parkingSpots.collectAsStateWithLifecycle().value
     val userLocation = homeViewModel.location.collectAsStateWithLifecycle().value
     val locating = homeViewModel.locating.collectAsStateWithLifecycle().value
+    val locationServicesOn = homeViewModel.locationServicesOn.collectAsStateWithLifecycle().value
     val filters = homeViewModel.filters.collectAsStateWithLifecycle().value
     val savedIds = accountViewModel.savedIds.collectAsStateWithLifecycle().value
 
@@ -164,6 +165,7 @@ fun HomeScreen(
     var selectedSpotId by rememberSaveable { mutableStateOf<String?>(null) }
     var route by remember { mutableStateOf<RouteInfo?>(null) }
     var routeLoading by remember { mutableStateOf(false) }
+    var routeRetry by remember { mutableStateOf(0) }
     var hasPermission by remember { mutableStateOf(AppServices.location(context).hasPermission()) }
     val mapController = remember { ParkMapController() }
     var mapReady by remember { mutableStateOf(false) }
@@ -178,6 +180,10 @@ fun HomeScreen(
     LaunchedEffect(Unit) {
         if (hasPermission) homeViewModel.refreshLocation()
         else permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+    // Back from Android's location settings (or anywhere): if location was off, look again.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        if (hasPermission && !locationServicesOn) homeViewModel.refreshLocation()
     }
     LaunchedEffect(userLocation, mapReady) {
         if (mapReady && !userLocation.isFallback && !homeViewModel.hasCentredOnUser) {
@@ -209,12 +215,14 @@ fun HomeScreen(
     val routeOrigin = destination?.second ?: userLocation.latLng.takeUnless { userLocation.isFallback }
 
     fun selectSpot(spot: ParkingSpot) {
+        // Tapping the same pin again after a failed route (e.g. it was offline) retries it.
+        if (spot.id == selectedSpotId && route == null && !routeLoading) routeRetry++
         selectedSpotId = spot.id
         parkingViewModel.selectParkingSpot(spot)
     }
 
     // Re-runs when the spot changes or the origin changes (e.g. the GPS fix lands after the tap).
-    LaunchedEffect(selectedSpotId, routeOrigin, mapReady) {
+    LaunchedEffect(selectedSpotId, routeOrigin, mapReady, routeRetry) {
         route = null
         val spot = allSpots.firstOrNull { it.id == selectedSpotId } ?: return@LaunchedEffect
         val spotLatLng = LatLng(spot.latitude, spot.longitude)
@@ -308,7 +316,7 @@ fun HomeScreen(
                 areaName = destination?.first ?: userLocation.areaName,
                 subtitle = when {
                     destination != null -> "Parking near your destination"
-                    userLocation.isFallback && !hasPermission -> "Location off · showing Mumbai"
+                    userLocation.isFallback && (!hasPermission || !locationServicesOn) -> "Location off · showing Mumbai"
                     else -> "Parking near you"
                 },
                 onProfileClick = onProfileClick,
@@ -405,6 +413,9 @@ fun HomeScreen(
             onClick = {
                 if (!hasPermission) {
                     permissionLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                } else if (!AppServices.location(context).isLocationEnabled()) {
+                    // Permission is fine but location is switched off: send them to the switch.
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS))
                 } else {
                     homeViewModel.refreshLocation()
                     destination = null

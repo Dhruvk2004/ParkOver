@@ -27,6 +27,8 @@ interface PlaceSearchService {
 /** Where the phone is, and what the area is called. */
 interface LocationProvider {
     fun hasPermission(): Boolean
+    /** Location switched on in system settings. */
+    fun isLocationEnabled(): Boolean = true
     suspend fun currentLatLng(): LatLng?
     fun areaName(latitude: Double, longitude: Double): String
 }
@@ -72,6 +74,7 @@ object AppServices {
 class DeviceLocationProvider(context: Context) : LocationProvider {
     private val helper = LocationHelper(context)
     override fun hasPermission() = helper.hasLocationPermission()
+    override fun isLocationEnabled() = helper.isLocationEnabled()
     override suspend fun currentLatLng(): LatLng? = helper.getCurrentLocation()?.let { LatLng(it.latitude, it.longitude) }
     override fun areaName(latitude: Double, longitude: Double) = helper.getLocationNameFromCoordinates(latitude, longitude)
 }

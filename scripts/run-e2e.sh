@@ -3,9 +3,9 @@
 # (real network, GPS, routing, search, rules). Each test uses brand-new throwaway accounts and
 # cleans up after itself (bookings cancelled, vehicles/profile/accounts deleted).
 #
-#   scripts/run-e2e.sh <adb-serial>            (both suites)
-#   scripts/run-e2e.sh <adb-serial> first      (first-launch only)
-#   scripts/run-e2e.sh <adb-serial> smoke      (smoke only)
+#   scripts/run-e2e.sh <adb-serial>            (all stages)
+#   scripts/run-e2e.sh <adb-serial> first      (first launch + location denied)
+#   scripts/run-e2e.sh <adb-serial> smoke      (smoke, network, offline, login offline, GPS off)
 #
 # Safety: backs up and restores your real login; records Wi-Fi and mobile data and turns them
 # back on even if a test fails; leaves location permission granted.
@@ -29,6 +29,7 @@ echo "Installing on $SERIAL…"
 "${ADB[@]}" shell rm -rf "/sdcard/Android/data/$PKG/files/test-failures" || true
 
 WIFI_WAS_ON="$("${ADB[@]}" shell settings get global wifi_on | tr -d '[:space:]')"
+LOCATION_WAS_ON="$("${ADB[@]}" shell cmd location is-location-enabled | tr -d '[:space:]')"
 DATA_WAS_ON="$("${ADB[@]}" shell settings get global mobile_data | tr -d '[:space:]')"
 
 "${ADB[@]}" shell am force-stop "$PKG"
@@ -36,15 +37,26 @@ DATA_WAS_ON="$("${ADB[@]}" shell settings get global mobile_data | tr -d '[:spac
 echo "Saved your login."
 
 cleanup() {
+  for perm in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION; do
+    "${ADB[@]}" shell pm clear-permission-flags "$PKG" "android.permission.$perm" user-set user-fixed >/dev/null 2>&1 || true
+  done
   [[ "$WIFI_WAS_ON" != "0" ]] && "${ADB[@]}" shell svc wifi enable || true
+  [[ "$LOCATION_WAS_ON" == "true" ]] && "${ADB[@]}" shell cmd location set-location-enabled true || true
   [[ "$DATA_WAS_ON" == "1" ]] && "${ADB[@]}" shell svc data enable || true
   "${ADB[@]}" shell pm grant "$PKG" android.permission.ACCESS_FINE_LOCATION || true
   "${ADB[@]}" shell pm grant "$PKG" android.permission.ACCESS_COARSE_LOCATION || true
   "${ADB[@]}" shell am force-stop "$PKG" || true
   "${ADB[@]}" shell "run-as $PKG sh -c 'cd /data/data/$PKG && if [ -d files/login-backup ]; then rm -f shared_prefs/com.google.firebase.auth.api.Store.*; cp files/login-backup/* shared_prefs/ 2>/dev/null; rm -rf files/login-backup; fi'" || true
-  echo "Restored your login, network and location permission."
+  echo "Restored your login, network, location setting and permission."
 }
 trap cleanup EXIT
+
+reset_location_permission() { # revoke AND clear "don't ask again", so Android really asks
+  for perm in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION; do
+    "${ADB[@]}" shell pm clear-permission-flags "$PKG" "android.permission.$perm" user-set user-fixed >/dev/null 2>&1 || true
+    "${ADB[@]}" shell pm revoke "$PKG" "android.permission.$perm" >/dev/null 2>&1 || true
+  done
+}
 
 run() { # $1 = class, $2 = output name
   "${ADB[@]}" shell am instrument -w -r -e firebase live -e class "$1" "$RUNNER" > "$OUT/$2.txt" || true
@@ -56,16 +68,18 @@ run() { # $1 = class, $2 = output name
 STATUS=0
 if [[ "$ONLY" != "smoke" ]]; then
 echo "1/2 First launch (location permission reset so Android asks)…"
-"${ADB[@]}" shell pm revoke "$PKG" android.permission.ACCESS_FINE_LOCATION || true
-"${ADB[@]}" shell pm revoke "$PKG" android.permission.ACCESS_COARSE_LOCATION || true
+reset_location_permission
 run "$PKG.e2e.E2eFirstLaunchTest" first-launch || STATUS=1
+echo "   Location denied (reset again so Android asks)…"
+reset_location_permission
+run "$PKG.e2e.E2eLocationDeniedTest" location-denied || STATUS=1
 fi
 
 if [[ "$ONLY" != "first" ]]; then
-echo "2/2 Smoke: search, route, book/cancel, live availability, network off…"
+echo "2/2 Smoke, network drop/switch, offline launch, login offline, GPS off…"
 "${ADB[@]}" shell pm grant "$PKG" android.permission.ACCESS_FINE_LOCATION || true
 "${ADB[@]}" shell pm grant "$PKG" android.permission.ACCESS_COARSE_LOCATION || true
-run "$PKG.e2e.E2eSmokeTest" smoke || STATUS=1
+run "$PKG.e2e.E2eSmokeTest,$PKG.e2e.E2eNetworkTest,$PKG.e2e.E2eOfflineLaunchTest,$PKG.e2e.E2eLoginOfflineTest,$PKG.e2e.E2eGpsOffTest" smoke || STATUS=1
 fi
 
 "${ADB[@]}" pull "/sdcard/Android/data/$PKG/files/test-failures" "$OUT/" >/dev/null 2>&1 || true

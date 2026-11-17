@@ -41,6 +41,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val _location = MutableStateFlow(fallback)
     val location: StateFlow<UserLocation> = _location.asStateFlow()
 
+    /** False when location is switched off in system settings (permission may still be granted). */
+    private val _locationServicesOn = MutableStateFlow(true)
+    val locationServicesOn: StateFlow<Boolean> = _locationServicesOn.asStateFlow()
+
     private val _locating = MutableStateFlow(false)
     val locating: StateFlow<Boolean> = _locating.asStateFlow()
 
@@ -56,6 +60,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshLocation() {
         if (!locationProvider.hasPermission()) {
             _location.value = fallback
+            return
+        }
+        _locationServicesOn.value = locationProvider.isLocationEnabled()
+        if (!_locationServicesOn.value) {
+            if (_location.value.isFallback) _location.value = fallback
+            _locating.value = false
             return
         }
         viewModelScope.launch {

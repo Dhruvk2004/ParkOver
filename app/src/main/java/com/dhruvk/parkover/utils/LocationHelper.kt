@@ -27,9 +27,23 @@ class LocationHelper(private val context: Context) {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    suspend fun getCurrentLocation(): Location? {
-        if (!hasLocationPermission()) return null
+    /** Location switched on in system settings (permission alone isn't enough). */
+    fun isLocationEnabled(): Boolean {
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return false
+        return androidx.core.location.LocationManagerCompat.isLocationEnabled(manager)
+    }
 
+    /**
+     * Current position, or null. Never hangs: with location services off the fused provider
+     * simply never answers, so return null at once in that case and give up after
+     * [FIX_TIMEOUT_MS] otherwise.
+     */
+    suspend fun getCurrentLocation(): Location? {
+        if (!hasLocationPermission() || !isLocationEnabled()) return null
+        return kotlinx.coroutines.withTimeoutOrNull(FIX_TIMEOUT_MS) { awaitLocation() }
+    }
+
+    private suspend fun awaitLocation(): Location? {
         return suspendCancellableCoroutine { continuation ->
             try {
                 fusedLocationClient.lastLocation
@@ -38,13 +52,14 @@ class LocationHelper(private val context: Context) {
                             continuation.resume(location)
                         } else {
                             // Request fresh location
-                            requestFreshLocation { freshLocation ->
-                                continuation.resume(freshLocation)
+                            val stop = requestFreshLocation { freshLocation ->
+                                if (continuation.isActive) continuation.resume(freshLocation)
                             }
+                            continuation.invokeOnCancellation { stop() }
                         }
                     }
                     .addOnFailureListener { exception ->
-                        continuation.resumeWithException(exception)
+                        if (continuation.isActive) continuation.resumeWithException(exception)
                     }
             } catch (e: SecurityException) {
                 continuation.resumeWithException(e)
@@ -52,10 +67,11 @@ class LocationHelper(private val context: Context) {
         }
     }
 
-    private fun requestFreshLocation(callback: (Location?) -> Unit) {
+    /** Asks for one fresh fix; returns a function that cancels the request. */
+    private fun requestFreshLocation(callback: (Location?) -> Unit): () -> Unit {
         if (!hasLocationPermission()) {
             callback(null)
-            return
+            return {}
         }
 
         val locationRequest = LocationRequest.Builder(
@@ -78,7 +94,9 @@ class LocationHelper(private val context: Context) {
             )
         } catch (e: SecurityException) {
             callback(null)
+            return {}
         }
+        return { fusedLocationClient.removeLocationUpdates(locationCallback) }
     }
 
     fun getAddressFromLocation(latitude: Double, longitude: Double): String {
@@ -165,6 +183,9 @@ class LocationHelper(private val context: Context) {
     companion object {
         // The UI is English-only; the device default can return area names in a local script.
         private val GEOCODER_LOCALE = Locale("en", "IN")
+
+        /** Longest wait for a GPS fix before falling back. */
+        const val FIX_TIMEOUT_MS = 12_000L
 
         private fun String.isLatinScript(): Boolean = all { it.code < 0x0250 }
 

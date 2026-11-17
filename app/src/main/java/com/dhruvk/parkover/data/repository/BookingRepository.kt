@@ -60,8 +60,14 @@ class BookingRepository(
         return try {
             val vehicleId = UUID.randomUUID().toString()
             val newVehicle = vehicle.copy(id = vehicleId, userId = userId)
-            if (newVehicle.isDefault) clearDefaultVehicle(userId)
-            vehiclesCollection.document(vehicleId).set(newVehicle).await()
+            val batch = firestore.batch()
+            batch.set(vehiclesCollection.document(vehicleId), newVehicle)
+            if (newVehicle.isDefault) {
+                // Same batch as the new vehicle, so there's never a moment with two defaults.
+                vehiclesCollection.whereEqualTo("userId", userId).get().await().documents
+                    .forEach { batch.update(it.reference, "default", false) }
+            }
+            batch.commit().await()
             Result.success(newVehicle)
         } catch (e: Exception) {
             Result.failure(e)
@@ -76,15 +82,16 @@ class BookingRepository(
     suspend fun setDefaultVehicle(vehicleId: String): Result<Unit> {
         val userId = auth.currentUser?.uid ?: return Result.failure(Exception("Not logged in"))
         return runCatching {
-            clearDefaultVehicle(userId)
-            vehiclesCollection.document(vehicleId).update("default", true).await()
+            // One batch that writes every vehicle of this user: the last tap fully decides who
+            // is default, so two quick taps can't leave two defaults (they used to clear and set
+            // in separate writes that could interleave).
+            val batch = firestore.batch()
+            vehiclesCollection.whereEqualTo("userId", userId).get().await().documents
+                .forEach { batch.update(it.reference, "default", it.id == vehicleId) }
+            batch.update(vehiclesCollection.document(vehicleId), "default", true)
+            batch.commit().await()
             Unit
         }
-    }
-
-    private suspend fun clearDefaultVehicle(userId: String) {
-        val defaults = vehiclesCollection.whereEqualTo("userId", userId).get().await()
-        defaults.documents.forEach { doc -> doc.reference.update("default", false).await() }
     }
 
     // ---------- Floors and spots ----------
@@ -98,15 +105,19 @@ class BookingRepository(
     suspend fun getFloorsWithSpots(spot: ParkingSpot, vehicleType: VehicleType, fromMs: Long, toMs: Long): List<FloorData> {
         if (spot.floors.isEmpty()) return emptyList()
         val window = lockBuckets(fromMs, toMs).let { if (it.isEmpty()) setOf(bucketOf(fromMs)) else it.toSet() }
+        // Capped wait: on a weak connection this read can hang, and the plan is display only
+        // (the booking transaction still refuses a bay someone holds).
         val booked = try {
-            slotLocksCollection
-                .whereEqualTo("parkingId", spot.id)
-                .get()
-                .await()
-                .documents
-                .filter { it.getLong("bucket") in window }
-                .mapNotNull { it.getString("spotNumber") }
-                .toSet()
+            withTimeoutOrNull(FLOOR_PLAN_TIMEOUT_MS) {
+                slotLocksCollection
+                    .whereEqualTo("parkingId", spot.id)
+                    .get()
+                    .await()
+                    .documents
+                    .filter { it.getLong("bucket") in window }
+                    .mapNotNull { it.getString("spotNumber") }
+                    .toSet()
+            } ?: emptySet()
         } catch (e: Exception) {
             emptySet()
         }
@@ -404,6 +415,8 @@ class BookingRepository(
         const val LOCK_BUCKET_MS = 30 * 60_000L
         /** How long to wait for the server before saying "you're offline". */
         const val ONLINE_CHECK_MS = 10_000L
+        /** Longest wait for the floor plan's taken bays before showing it anyway. */
+        const val FLOOR_PLAN_TIMEOUT_MS = 8_000L
         val ACTIVE_STATUSES = setOf(BookingStatus.PENDING.name, BookingStatus.CONFIRMED.name, BookingStatus.ACTIVE.name)
 
         fun bucketOf(timeMs: Long): Long = Math.floorDiv(timeMs, LOCK_BUCKET_MS)
