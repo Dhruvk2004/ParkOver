@@ -1,5 +1,9 @@
 package com.dhruvk.parkover.ui.screens.home
 
+import com.dhruvk.parkover.ui.components.OfflineNotice
+import com.dhruvk.parkover.ui.components.OfflineScreen
+import com.dhruvk.parkover.ui.components.rememberDebouncedOffline
+import com.dhruvk.parkover.ui.components.rememberIsOnline
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
@@ -155,6 +159,8 @@ fun HomeScreen(
     val userLocation = homeViewModel.location.collectAsStateWithLifecycle().value
     val locating = homeViewModel.locating.collectAsStateWithLifecycle().value
     val locationServicesOn = homeViewModel.locationServicesOn.collectAsStateWithLifecycle().value
+    val online by rememberIsOnline()
+    val showOfflineNotice by rememberDebouncedOffline(online)
     val filters = homeViewModel.filters.collectAsStateWithLifecycle().value
     val savedIds = accountViewModel.savedIds.collectAsStateWithLifecycle().value
 
@@ -194,6 +200,12 @@ fun HomeScreen(
 
     // ---- Filtered spots ----
     val allSpots = (spotsResult as? ApiResult.Success)?.data.orEmpty()
+    // Offline: the full illustrated state only while parkings have never loaded; once anything
+    // is on screen, a drop only shows the small notice. Back online, a failed load retries itself.
+    val showOfflineScreen = !online && allSpots.isEmpty() && spotsResult is ApiResult.Error
+    LaunchedEffect(online) {
+        if (online && parkingViewModel.parkingSpots.value is ApiResult.Error) parkingViewModel.loadParkingSpots()
+    }
     val centre = destination?.second ?: userLocation.latLng
     val visibleSpots = remember(allSpots, filters, centre) {
         SpotFilters.apply(allSpots, filters, centre.latitude, centre.longitude, NEARBY_RADIUS_KM)
@@ -391,6 +403,7 @@ fun HomeScreen(
 
             // Status banners
             when {
+                showOfflineNotice && allSpots.isNotEmpty() -> OfflineNotice()
                 spotsResult is ApiResult.Error -> StatusBanner(
                     text = "Couldn't load parking. Check your connection.",
                     action = "Retry",
@@ -472,6 +485,14 @@ fun HomeScreen(
                     }
                 )
             }
+        }
+
+        // Opened with no connection and nothing to show yet.
+        AnimatedVisibility(visible = showOfflineScreen, enter = fadeIn(), exit = fadeOut()) {
+            OfflineScreen(
+                onRetry = { parkingViewModel.loadParkingSpots() },
+                modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            )
         }
     }
 }

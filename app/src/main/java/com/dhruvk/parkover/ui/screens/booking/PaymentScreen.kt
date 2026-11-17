@@ -1,5 +1,10 @@
 package com.dhruvk.parkover.ui.screens.booking
 
+import com.dhruvk.parkover.ui.components.OfflineNotice
+import com.dhruvk.parkover.ui.components.rememberDebouncedOffline
+import com.dhruvk.parkover.ui.components.rememberIsOnline
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -68,6 +73,8 @@ fun PaymentScreen(
 ) {
     val data = flowViewModel.bookingData.collectAsStateWithLifecycle().value
     val submit = flowViewModel.submitState.collectAsStateWithLifecycle().value
+    val online by rememberIsOnline()
+    val showOfflineNotice by rememberDebouncedOffline(online)
     val upiIds = accountViewModel.upiIds.collectAsStateWithLifecycle().value
     val timeFormat = remember { SimpleDateFormat("h:mm a", Locale.getDefault()) }
 
@@ -177,11 +184,16 @@ fun PaymentScreen(
             if (submit is SubmitState.Error) {
                 Text(submit.message, color = ErrorRed, style = MaterialTheme.typography.bodyMedium)
             }
+            // Your choices stay; booking waits until the connection is back.
+            AnimatedVisibility(visible = showOfflineNotice) {
+                OfflineNotice(message = "Your choices are kept. You can confirm once you're back online.")
+            }
         }
 
         BottomActionBar {
             PrimaryButton(
                 text = "Confirm booking · ${formatRupees(data.totalPrice, true)}",
+                enabled = online,
                 loading = submit is SubmitState.Submitting,
                 onClick = {
                     flowViewModel.clearSubmitError()

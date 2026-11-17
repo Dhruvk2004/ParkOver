@@ -1,0 +1,505 @@
+<title>ParkOver Launch Audit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: one readable column; journeys as status-striped rows; wide tables scroll in place. */
+:root {
+  --bg: #f6f5fb; --surface: #ffffff; --ink: #1c1b2e; --muted: #5d5b72; --line: #e3e0ef;
+  --brand: #613eea; --brand-ink: #4a2bc7; --brand-tint: #efeafe;
+  --real: #15803d; --real-bg: #e7f6ec; --partial: #a15c07; --partial-bg: #fdf1dc;
+  --mock: #7c3aed; --mock-bg: #f1e9fe; --missing: #c62828; --missing-bg: #fde8e8;
+  --display: "Jost", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12111c; --surface: #1b1a29; --ink: #ecebf5; --muted: #a7a4bd; --line: #2e2c42;
+  --brand: #9c86ff; --brand-ink: #b9a9ff; --brand-tint: #26213f;
+  --real: #5fd38a; --real-bg: #16301f; --partial: #f0b45a; --partial-bg: #33270f;
+  --mock: #c4a6ff; --mock-bg: #2a2142; --missing: #ff8a80; --missing-bg: #3a1c1c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12111c; --surface: #1b1a29; --ink: #ecebf5; --muted: #a7a4bd; --line: #2e2c42;
+  --brand: #9c86ff; --brand-ink: #b9a9ff; --brand-tint: #26213f;
+  --real: #5fd38a; --real-bg: #16301f; --partial: #f0b45a; --partial-bg: #33270f;
+  --mock: #c4a6ff; --mock-bg: #2a2142; --missing: #ff8a80; --missing-bg: #3a1c1c; color-scheme: dark }
+
+body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 44px; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.2; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 5vw, 42px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 24px; font-weight: 600; }
+h3 { font-size: 17px; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+a { color: var(--brand-ink); }
+.eyebrow { font: 600 12px/1 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+section { display: grid; gap: 16px; min-width: 0; }
+.lede { color: var(--muted); font-size: 16px; }
+.muted { color: var(--muted); }
+
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; display: grid; gap: 14px; }
+.verdict strong { color: var(--brand-ink); }
+.counts { display: flex; flex-wrap: wrap; gap: 10px; }
+.count { display: flex; align-items: baseline; gap: 8px; padding: 8px 12px; border-radius: 10px; font-variant-numeric: tabular-nums; }
+.count b { font: 700 22px/1 var(--display); }
+
+.pill { display: inline-block; font: 600 11px/1 var(--body); letter-spacing: .04em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.real { color: var(--real); background: var(--real-bg); }
+.partial { color: var(--partial); background: var(--partial-bg); }
+.mock { color: var(--mock); background: var(--mock-bg); }
+.missing { color: var(--missing); background: var(--missing-bg); }
+.prio { font: 600 12px/1.3 var(--body); color: var(--muted); }
+.prio.block { color: var(--missing); }
+
+.journeys { display: grid; gap: 10px; }
+.j { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.j[data-s="real"] { border-left-color: var(--real); }
+.j[data-s="partial"] { border-left-color: var(--partial); }
+.j[data-s="mock"] { border-left-color: var(--mock); }
+.j[data-s="missing"] { border-left-color: var(--missing); }
+.j-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.j-head h3 { flex: 1 1 220px; }
+.j dl { display: grid; grid-template-columns: 9.5em 1fr; gap: 4px 14px; margin: 0; }
+.j dt { color: var(--muted); font-size: 13px; padding-top: 1px; }
+.j dd { margin: 0; min-width: 0; }
+@media (max-width: 560px) { .j dl { grid-template-columns: 1fr; } .j dt { padding-top: 6px; } }
+
+.callout { background: var(--brand-tint); border-radius: 12px; padding: 18px 20px; display: grid; gap: 8px; }
+.callout h3 { color: var(--brand-ink); }
+
+.scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font: 600 12px/1.3 var(--body); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.flow { display: grid; gap: 8px; counter-reset: step; }
+.flow li { list-style: none; position: relative; padding: 10px 12px 10px 46px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.flow li::before { counter-increment: step; content: counter(step); position: absolute; left: 12px; top: 10px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 600 12px/1 var(--body); color: var(--surface); background: var(--brand); }
+ol.flow { padding: 0; margin: 0; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.card ul, section > ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.tag { font: 600 11px/1 var(--body); color: var(--brand-ink); background: var(--brand-tint); padding: 4px 8px; border-radius: 6px; justify-self: start; }
+
+.phase { display: grid; gap: 10px; }
+.phase h3 { display: flex; align-items: center; gap: 10px; }
+.sources { font-size: 13px; color: var(--muted); }
+.sources ol { padding-left: 22px; display: grid; gap: 2px; margin: 0; }
+.sources a { word-break: break-all; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+<header style="display:grid;gap:12px">
+  <span class="eyebrow">Product audit · 17 Nov 2026 · build on compose-revamp</span>
+  <h1>ParkOver Launch Audit</h1>
+  <p class="lede">Every driver journey checked against the code and against parking apps that are live today (Park+, SpotHero, JustPark, PayByPhone, Get My Parking, BMC's own plans). What is real, what is mocked, what is missing, and what to build before the Play Store.</p>
+</header>
+
+<section class="verdict" aria-labelledby="verdict-h">
+  <h2 id="verdict-h">The short version</h2>
+  <p><strong>ParkOver is a well-built booking front end over parkings that don't know it exists.</strong> Search, live free-now counts, double-booking protection and the booking flow are real and tested. But the 104 parkings come from a static JSON file, no operator sees a booking, nobody checks a car in, and no money moves. A driver who books today arrives at a gate that has never heard of the reservation.</p>
+  <p>The missing half is the <strong>operator side</strong>: lots, prices, capacity and payouts managed by the people who run the parking, with payments chained to them. That, plus payments, legal pages and account deletion, is what stands between this build and a public launch.</p>
+  <div class="counts" aria-label="Journey status counts">
+    <span class="count real"><b>6</b> real</span>
+    <span class="count partial"><b>7</b> partial</span>
+    <span class="count mock"><b>3</b> mocked or invented</span>
+    <span class="count missing"><b>8</b> missing</span>
+  </div>
+</section>
+
+<section aria-labelledby="journeys-h">
+  <span class="eyebrow">Part 1</span>
+  <h2 id="journeys-h">Driver journeys, one by one</h2>
+  <p class="muted">Bracketed numbers point to the sources at the end. Priority: <span class="prio block">Launch blocker</span> must be fixed before the public release; <span class="prio">Before scale</span> before marketing beyond a pilot; <span class="prio">Later</span> when there's traction.</p>
+
+  <div class="journeys">
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Find parking (map, search, filters)</h3><span class="pill real">Real</span><span class="prio">Polish later</span></div>
+      <dl>
+        <dt>Today</dt><dd>Free MapLibre map, price pins, own parkings listed before places, Nearby / Under ₹50 / EV / Covered / 24h filters, real road routes (OpenRouteService), offline screen.</dd>
+        <dt>Real apps</dt><dd>Same baseline: map/list with price, hours and vehicle type per lot [2][6].</dd>
+        <dt>Gap</dt><dd>Search covers our 104 lots only; no "near my destination at 7 pm" time filter; routing key ships in the APK (needs the proxy).</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Live availability ("free now")</h3><span class="pill partial">Partial</span><span class="prio block">Launch blocker (copy)</span></div>
+      <dl>
+        <dt>Today</dt><dd>Free now = capacity − ParkOver bookings in the current half hour. Correct for our bookings, time-aware, cheap.</dd>
+        <dt>Real apps</dt><dd>Park+ predicts fill rate from gate data; SpotHero and JustPark show operator-set inventory [9][10][12]; GMP reads barriers and plate cameras [1].</dd>
+        <dt>Gap</dt><dd>It doesn't know about drive-in cars, so a lot that's physically full shows "104 free". The Start screen promises "See free spots in real time" and "Live availability in Mumbai", which overclaims. Reword now ("bays you can book"), and get real occupancy from operators later.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="mock">
+      <div class="j-head"><h3>Parking details, photos, ratings</h3><span class="pill mock">Mocked</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Name, address, prices, hours, amenities, photos, rating and review count all come from a hand-edited JSON on GitHub. Ratings like "3.3 (90)" are typed numbers, not reviews. The <code>Review</code> model exists, but nothing writes or shows reviews.</dd>
+        <dt>Real apps</dt><dd>Operator-managed listings; reviews come from completed stays.</dd>
+        <dt>Gap</dt><dd>Hide ratings until real reviews exist, or ship reviews tied to completed bookings. Move listings to Firestore, owned by operators (Part 2).</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="mock">
+      <div class="j-head"><h3>Pick a bay (floor plan)</h3><span class="pill mock">Invented layout</span><span class="prio">Before scale</span></div>
+      <dl>
+        <dt>Today</dt><dd>Bays are generated: G-01 to G-104 in two columns. "EV" is every 10th bay and "wheelchair" is the first two, by formula. Taken bays are real (slot locks).</dd>
+        <dt>Real apps</dt><dd>Most sell "a space in the lot", not a numbered bay; where bays exist, the operator defines them [8][9].</dd>
+        <dt>Gap</dt><dd>Either let operators define real bays (numbers, EV, accessible) or drop bay choice and sell lot-level capacity with the bay assigned at the gate. Never show an EV bay that may not exist.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Book (vehicle → bay → time → review)</h3><span class="pill real">Real</span><span class="prio">Polish later</span></div>
+      <dl>
+        <dt>Today</dt><dd>Transactional booking with per-bay slot locks, time-aware capacity, offline fail-fast, retries in a rush; 148-scenario test plan, load-tested.</dd>
+        <dt>Real apps</dt><dd>Pre-booking with a time window, plus drive-in fallback [7]; plate captured and shared with the operator [7].</dd>
+        <dt>Gap</dt><dd>Opening hours are shown but not enforced (you can book a lot for when it's closed). No daily rates or monthly passes, though <code>pricePerDay</code> already exists in the data. Per-type capacity is enforced by the app, not the rules.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="mock">
+      <div class="j-head"><h3>Pay</h3><span class="pill mock">Mocked</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Only "Pay at parking" works. Card and Net banking say "Soon". Saved UPI IDs are stored and never used. Every booking is <code>paymentStatus = PENDING</code> forever. The screen says "No money is taken in the app yet".</dd>
+        <dt>Real apps</dt><dd>Charged at booking (SpotHero, JustPark) or on arrival (PayByPhone); UPI-first plus cards, wallets and FASTag in India [7][8][11][17].</dd>
+        <dt>Gap</dt><dd>A real gateway (Part 3) with a server that creates orders and verifies webhooks. Until then, ship "pay at parking" honestly as a <em>reservation</em>, with operators who agree to honour it.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Confirmation and QR pass</h3><span class="pill partial">Partial</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Booking ID, QR (<code>PARKOVER:&lt;id&gt;</code>), directions, My bookings.</dd>
+        <dt>Real apps</dt><dd>QR, plate or FASTag checked at the gate by an attendant or barrier [7][8][1].</dd>
+        <dt>Gap</dt><dd>Nobody can scan the QR. It has no signature, so anyone can make a valid-looking one. It needs an operator scanner (Part 2) and a signed or server-checked code.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Arrive, park, leave (check-in / check-out)</h3><span class="pill missing">Missing</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Status never changes after CONFIRMED. ACTIVE, COMPLETED and EXPIRED are read but never set. No-shows hold the bay until the end time; <code>extraCharges</code> for overstay is never used.</dd>
+        <dt>Real apps</dt><dd>Entry and exit events drive the stay; overstay rules are stated [8]; GMP and Park+ use gates, LPR and FASTag [1][12].</dd>
+        <dt>Gap</dt><dd>Operator scan sets ACTIVE at entry and COMPLETED at exit. Auto-expire no-shows after a grace period and free the slots. Show an overstay rule at checkout.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Extend a stay</h3><span class="pill partial">Partial</span><span class="prio">Before scale</span></div>
+      <dl>
+        <dt>Today</dt><dd>+1 h from My bookings during an active stay; checks the bay is free and adds occupancy.</dd>
+        <dt>Real apps</dt><dd>In-app extension is standard [8][11].</dd>
+        <dt>Gap</dt><dd>"Active" is time-based, not a real entry. Extension doesn't check the lot's capacity (no spot data on that screen) or charge anything.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Cancel and refund</h3><span class="pill partial">Partial</span><span class="prio block">Launch blocker (policy)</span></div>
+      <dl>
+        <dt>Today</dt><dd>Free cancel any time before check-in; slots and counts restored. No policy text anywhere.</dd>
+        <dt>Real apps</dt><dd>SpotHero: full refund until the start time, none after. JustPark: refund if more than 24 h ahead [8][13].</dd>
+        <dt>Gap</dt><dd>Write a cancellation and refund policy and show it at checkout. Once payments are real: automatic refunds through the gateway, and a no-show rule.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Receipts and GST invoices</h3><span class="pill missing">Missing</span><span class="prio block">Launch blocker once paid</span></div>
+      <dl>
+        <dt>Today</dt><dd>None. Prices add a 10% "tax" line, but parking is SAC 996743 at 18% GST [20].</dd>
+        <dt>Real apps</dt><dd>Digital receipt per booking; BMC is moving to digital receipts [5].</dd>
+        <dt>Gap</dt><dd>Fix the tax rate (CA to confirm who charges GST: operator or platform), then send a receipt or invoice per paid booking.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Notifications and reminders</h3><span class="pill missing">Missing</span><span class="prio">Before scale</span></div>
+      <dl>
+        <dt>Today</dt><dd>No push at all. "Booking reminders" in Profile shows "Soon".</dd>
+        <dt>Real apps</dt><dd>Reminders before start, before expiry, and on extension or cancellation.</dd>
+        <dt>Gap</dt><dd>FCM plus a scheduler (needs a server). A quick first step is local notifications scheduled on the phone at booking time.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Saved parkings</h3><span class="pill real">Real</span><span class="prio">—</span></div>
+      <dl><dt>Today</dt><dd>Save or unsave from the map, live free-now, road distance, offline notice. Tested.</dd></dl>
+    </article>
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Vehicles</h3><span class="pill real">Real</span><span class="prio">Later</span></div>
+      <dl>
+        <dt>Today</dt><dd>Add (Indian plates incl. BH and Delhi), one default (atomic), delete with undo. Tested.</dd>
+        <dt>Gap</dt><dd>Duplicate plates aren't blocked; plate isn't verified (Vahan lookup is a later option).</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Sign up and log in</h3><span class="pill partial">Partial</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Email and password works and is tested; the debug-only Dev login is gone from release.</dd>
+        <dt>Gap</dt><dd>Google sign-in uses the deprecated <code>GoogleSignIn</code> API (move to Credential Manager) and isn't verified on the new Firebase project. No phone/OTP login, which most Indian drivers expect. No email verification.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Delete my account</h3><span class="pill missing">Missing</span><span class="prio block">Launch blocker (Play policy)</span></div>
+      <dl>
+        <dt>Today</dt><dd>No way to delete an account or its data.</dd>
+        <dt>Requirement</dt><dd>Google Play requires apps with sign-up to offer account deletion in the app and through a web link.</dd>
+        <dt>Gap</dt><dd>In-app "Delete account" (cancel active bookings, delete vehicles, profile and auth user) plus a small web page for the Play listing.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Privacy policy and terms</h3><span class="pill missing">Missing</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Sign-up says "By continuing you agree to the Terms and Privacy Policy", but there are no such pages.</dd>
+        <dt>Gap</dt><dd>Publish both (also needed for the Play Data safety form and any payment gateway [27]), and link them from sign-up and Profile.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Help and support</h3><span class="pill partial">Write-only</span><span class="prio block">Launch blocker</span></div>
+      <dl>
+        <dt>Today</dt><dd>Tickets are written to Firestore, and nobody can read them (no admin).</dd>
+        <dt>Gap</dt><dd>An admin inbox, or route tickets to email or WhatsApp; a visible support contact.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="partial">
+      <div class="j-head"><h3>Profile photo</h3><span class="pill partial">Unverified</span><span class="prio">Before scale</span></div>
+      <dl>
+        <dt>Gap</dt><dd>Uploads to Firebase Storage, but Storage rules aren't in the repo, so the bucket is either locked (upload fails) or open (anyone can write). Add and test Storage rules.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Offline and bad network</h3><span class="pill real">Real</span><span class="prio">—</span></div>
+      <dl><dt>Today</dt><dd>Illustrated offline screen, calm notice, auto-recovery, Confirm held until online, offline bookings never sneak through. Tested on a real phone.</dd></dl>
+    </article>
+
+    <article class="j" data-s="real">
+      <div class="j-head"><h3>Security and data integrity</h3><span class="pill real">Real</span><span class="prio block">Two items left</span></div>
+      <dl>
+        <dt>Today</dt><dd>Strict Firestore rules (private bookings, ±1 occupancy, slot locks), emulator-tested.</dd>
+        <dt>Gap</dt><dd>App Check, capacity in Firestore so the rules can enforce it, and restricting the Firebase key GitHub flagged.</dd>
+      </dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>Monthly passes and business parking</h3><span class="pill missing">Missing</span><span class="prio">Later</span></div>
+      <dl><dt>Real apps</dt><dd>Park+ monthly passes (₹1,800 per site, ₹2,500 city-wide in 2021), SpotHero and JustPark monthly [7][8][13]. A strong recurring-revenue line for office areas like BKC.</dd></dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>FASTag and plate recognition</h3><span class="pill missing">Missing</span><span class="prio">Later</span></div>
+      <dl><dt>Real apps</dt><dd>Mumbai T2 reads FASTag at entry and deducts at exit; 66% of airport parkers pay by FASTag; BMC is moving on-street parking to FASTag [5][17][18]. It needs an NPCI-certified acquirer bank and gate hardware, so it's a partnership step, not a coding task.</dd></dl>
+    </article>
+
+    <article class="j" data-s="missing">
+      <div class="j-head"><h3>iPhone users</h3><span class="pill missing">Missing</span><span class="prio">Before scale</span></div>
+      <dl><dt>Today</dt><dd>Android only. See Part 4.</dd></dl>
+    </article>
+
+  </div>
+</section>
+
+<section aria-labelledby="ops-h">
+  <span class="eyebrow">Part 2</span>
+  <h2 id="ops-h">The missing half: operators and admin</h2>
+  <p>Every serious parking app has an operator side. SpotHero has a Control Panel for rates, inventory and revenue [9]. JustPark owners list a space in about ten minutes [10]. Get My Parking <em>is</em> an operator platform with an admin dashboard, plate cameras and gate kits [1]. ParkOver has none, so a booking reaches nobody.</p>
+
+  <div class="cols">
+    <div class="card">
+      <span class="tag">Admin (you)</span>
+      <h3>Run the marketplace</h3>
+      <ul>
+        <li>Approve operators after KYC (PAN, bank, GST if any)</li>
+        <li>Create or approve lots; set the platform commission</li>
+        <li>See all bookings, refunds, disputes and support tickets</li>
+        <li>Payout reports and reconciliation</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">Operator dashboard (web)</span>
+      <h3>Manage their lots</h3>
+      <ul>
+        <li>Lot details: address, pin, photos, hours, closed days</li>
+        <li>Capacity per vehicle type and floor; real bays if they sell them</li>
+        <li>Prices: hourly, daily, monthly passes; holiday overrides</li>
+        <li>Today's bookings, occupancy, revenue, payouts</li>
+        <li>Turn a lot off ("full", "closed for an event")</li>
+      </ul>
+    </div>
+    <div class="card">
+      <span class="tag">Attendant app (phone)</span>
+      <h3>Work the gate</h3>
+      <ul>
+        <li>Scan the driver's QR → verify → mark <b>arrived</b></li>
+        <li>Scan or tap at exit → mark <b>completed</b>, show overstay due</li>
+        <li>Record drive-in cars so free-now is true</li>
+        <li>Works offline at basements; syncs later</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h3>How payments chain to operators</h3>
+    <ol class="flow">
+      <li>Driver confirms → ParkOver's server creates a gateway order for the lot's price (never trust the price from the phone).</li>
+      <li>Driver pays by UPI intent, card or wallet → the gateway's webhook hits the server → the booking becomes CONFIRMED and PAID. Slots are held for 10 minutes while unpaid.</li>
+      <li>The payment is tagged with the lot's <b>operator</b>. With Razorpay Route, the operator's share goes to their linked account and ParkOver keeps its commission automatically [26].</li>
+      <li>Cancellation inside the policy → automatic refund through the gateway; no-show → per policy.</li>
+      <li>Attendant scans at entry and exit; overstay is charged at exit.</li>
+      <li>Weekly payout report per operator; GST invoice per booking.</li>
+    </ol>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>What it changes in the data</h3>
+      <ul>
+        <li><code>operators/{id}</code>: KYC status, bank/linked account, commission</li>
+        <li><code>parkings/{id}</code> in Firestore, owned by an operator. This replaces the GitHub JSON, so the rules can finally check capacity.</li>
+        <li><code>payments/{id}</code>, <code>refunds/{id}</code>, written only by the server</li>
+        <li>Roles in auth claims: driver, attendant, operator, admin</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>What it needs that the app can't do</h3>
+      <ul>
+        <li><b>A server.</b> Orders, webhooks, refunds, payouts, reminders and expiring no-shows can't run on the phone.</li>
+        <li>Firebase Cloud Functions need the paid Blaze plan; a free alternative is a Cloudflare Worker (also the planned routing proxy).</li>
+        <li>The operator dashboard is a web app; it can share code with an iPhone web version (Part 4).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="pay-h">
+  <span class="eyebrow">Part 3</span>
+  <h2 id="pay-h">Payments in India, concretely</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Option</th><th>Fee (published)</th><th>Split to operators</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>Razorpay Standard</td><td class="num">2% + 18% GST on fee</td><td>Route: +0.1% [21][26]</td><td>Route needs over ₹40 lakh domestic turnover (GST-3B) in FY25 or FY26 and a use-case review, so <b>a new startup may not qualify</b> [26].</td></tr>
+        <tr><td>Cashfree</td><td class="num">1.95%</td><td>Easy Split: 0.20–0.25% platform fee, ₹3–15 per payout [22]</td><td>No setup fee. A good fit if Route is out of reach.</td></tr>
+        <tr><td>PhonePe PG</td><td>No public rate card</td><td>Not verified</td><td>Its blog says UPI is 0% MDR for small merchants [23]. Confirm on signup.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <ul>
+    <li><b>UPI:</b> build UPI <em>Intent</em> (opens GPay or PhonePe). P2P collect requests ended on 1 Oct 2025, and Cashfree blocked merchant Collect on Android from 28 Feb 2026 [24][25].</li>
+    <li><b>KYC to open the account:</b> a sole proprietor needs PAN, address proof and 2 of Udyam/GST/Shop Act/IEC/bill; a Pvt Ltd needs incorporation documents and director KYC [27]. Gateways also check that the website, terms, refund and privacy pages are live (practice; not sourced).</li>
+    <li><b>Tax:</b> collecting money for operators likely makes ParkOver an e-commerce operator: mandatory GST registration and 0.5% TCS on operators' sales [28]. <b>Confirm with a CA</b> before taking a single payment.</li>
+    <li><b>Interim option:</b> launch the pilot with "pay at parking" (cash or the lot's own UPI QR) and operators who honour reservations, then switch on in-app payment once the business entity and gateway are ready.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="ios-h">
+  <span class="eyebrow">Part 4</span>
+  <h2 id="ios-h">Reaching iPhone drivers</h2>
+  <p>Android dominates phones in India, but car owners skew higher-income, where iPhones are common. Park+ alone has an iOS app rated 4.7 from about 168K ratings [6]. Losing those drivers matters most in exactly the places ParkOver targets (BKC, Lower Parel, malls, the airport).</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Path</th><th>Effort</th><th>What you get</th><th>Verdict</th></tr></thead>
+      <tbody>
+        <tr><td><b>Mobile web booking</b> (link opens in Safari, can be added to the home screen)</td><td>Weeks</td><td>iPhone drivers can find, book and show the QR with no install. Shares a stack with the operator web dashboard you need anyway. Shareable links ("book this lot") help growth on WhatsApp.</td><td><b>Do first.</b></td></tr>
+        <tr><td><b>Kotlin / Compose Multiplatform</b></td><td>Months</td><td>A native iOS app reusing this Kotlin code: booking rules, free-now, models, and much of the Compose UI. MapLibre and Firebase both have iOS SDKs.</td><td><b>Do second</b>, once the web version proves demand.</td></tr>
+        <tr><td>SwiftUI native rewrite</td><td>Months</td><td>Best iOS feel, but two codebases forever.</td><td>Not for a small team.</td></tr>
+        <tr><td>Flutter / React Native rewrite</td><td>Months</td><td>One codebase, but throws away a tested Android app.</td><td>No.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Also: an Apple developer account is $99 a year, and App Store review needs the same privacy, deletion and payment rules sorted.</p>
+</section>
+
+<section aria-labelledby="plan-h">
+  <span class="eyebrow">Part 5</span>
+  <h2 id="plan-h">What I'd do, in order</h2>
+
+  <div class="phase">
+    <h3><span class="pill missing">Before any public release</span></h3>
+    <ul>
+      <li>Privacy policy, terms, cancellation and refund policy; link them in the app.</li>
+      <li>In-app account deletion plus a web deletion link (Play policy).</li>
+      <li>Honest copy: "bays you can book", not "real-time availability"; hide made-up ratings; drop invented EV and accessible bays.</li>
+      <li>Enforce opening hours in booking; fix the GST rate on the price breakdown.</li>
+      <li>Support that reaches a person (email or WhatsApp at minimum).</li>
+      <li>App Check, Storage rules, routing proxy, restrict the flagged Firebase key.</li>
+      <li>Play Console checklist: Data safety form, content rating, target API, and, for a new personal developer account, the closed test with testers before production access (check the exact rule in your Play Console).</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <h3><span class="pill partial">Pilot (5–10 partner lots)</span></h3>
+    <ul>
+      <li>Move parkings to Firestore with capacity; a minimal admin page to edit them.</li>
+      <li>Attendant scanner app: entry and exit set ACTIVE and COMPLETED; auto-expire no-shows.</li>
+      <li>Pay at parking, but with operator agreements in place, so a reservation is real.</li>
+      <li>Local booking reminders; a "drive-in" button for attendants so free-now is true.</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <h3><span class="pill real">Before scaling</span></h3>
+    <ul>
+      <li>Business entity, gateway KYC, CA sign-off on GST/TCS; a small server for orders, webhooks, refunds and reminders.</li>
+      <li>In-app UPI and cards; split payouts (Route or Cashfree Easy Split); invoices.</li>
+      <li>Operator web dashboard (lots, prices, passes, payouts); mobile web booking for iPhone users.</li>
+      <li>Reviews from completed stays; phone OTP login.</li>
+    </ul>
+  </div>
+
+  <div class="phase">
+    <h3><span class="pill mock">Later</span></h3>
+    <ul>
+      <li>Monthly passes, corporate parking, FASTag through an acquirer bank, plate recognition.</li>
+      <li>Native iOS with Compose Multiplatform.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sources" aria-labelledby="src-h">
+  <h3 id="src-h">Sources</h3>
+  <ol>
+    <li><a href="https://www.parking.net/parking-news/get-my-parking/smartest-parking-admin-dashboard-for-operators">Get My Parking: operator admin dashboard</a></li>
+    <li><a href="https://www.mumbailive.com/en/civic/bmc-added-feature-to-its-mcgm-247-mobile-app-to-find-parking-slots-38538">MCGM 24x7 app: parking lots</a></li>
+    <li><a href="https://www.freepressjournal.in/mumbai/your-car-is-here-bmc-proposes-parking-app-for-mumbaikar-to-ease-congestion">BMC proposes a parking app (budget 2025-26)</a></li>
+    <li><a href="https://www.freepressjournal.in/mumbai/mumbai-traffic-plan-bmc-approves-3-crore-smart-parking-dashboard-app-to-show-real-time-slot-availability">BMC approves ₹3 cr smart parking dashboard</a></li>
+    <li><a href="https://www.freepressjournal.in/mumbai/now-pay-parking-fees-via-fastag-in-mumbai-as-bmc-cracks-down-on-fake-parking-attendants">BMC: FASTag parking, digital receipts</a></li>
+    <li><a href="https://apps.apple.com/in/app/id1244749178">Park+ on the App Store</a></li>
+    <li><a href="https://www.outlookbusiness.com/enterprise/big-idea/that-raw-nerve-in-personal-mobility-park-has-found-a-way-around-it-6256">Outlook Business on Park+</a></li>
+    <li><a href="https://spothero.com/faq">SpotHero FAQ</a></li>
+    <li><a href="https://operator-help.spothero.com/en/articles/9346432-sell-online-transient-parking-reservations">SpotHero operator help</a></li>
+    <li><a href="https://www.justpark.com/how-it-works/rent-out-your-driveway">JustPark: rent out your driveway</a></li>
+    <li><a href="https://www.paybyphone.com/how-it-works">PayByPhone: how it works</a></li>
+    <li><a href="https://inc42.com/startups/how-park-cracked-car-owners-biggest-pain-points-and-built-a-inr-134-cr-business">Inc42 on Park+</a></li>
+    <li><a href="https://justpark.com/cancellation-policy">JustPark cancellation policy</a></li>
+    <li><a href="https://moneysavingexpert.com/shopping/cheap-parking-rental/">MoneySavingExpert: parking rental fees</a></li>
+    <li><a href="https://www.appbrain.com/dev/Park%2B/">AppBrain: Park+ Android</a></li>
+    <li><a href="https://apps.apple.com/in/app/parkingpal/id1580035244">ParkingPal on the App Store</a></li>
+    <li><a href="https://www.freepressjournal.in/mumbai/mumbai-airport-introduces-cashless-parking-with-upi-and-fastag-for-seamless-payments">Mumbai airport: cashless parking</a></li>
+    <li><a href="https://curlytales.com/mumbai-airports-t2-terminal-gets-fastag-parking-heres-all-you-need-to-know-about-it">Mumbai T2 FASTag parking</a></li>
+    <li><a href="https://www.icici.bank.in/about-us/news-room/2022/icici-bank-enables-fastag-based-parking-payment-at-terminal-two-of-mumbai-airport">ICICI: FASTag parking at T2</a></li>
+    <li><a href="https://www.taxtmi.com/article/detailed?id=15913">GST on parking services (SAC 996743)</a></li>
+    <li><a href="https://razorpay.com/pricing/">Razorpay pricing</a></li>
+    <li><a href="https://www.cashfree.com/payment-gateway-charges/">Cashfree charges</a></li>
+    <li><a href="https://business.phonepe.com/articles/payment-gateway-charges-in-india-complete-mdr-and-fee-breakdown">PhonePe: gateway charges</a></li>
+    <li><a href="https://www.businesstoday.in/personal-finance/banking/story/npci-to-tighten-upi-rules-peer-to-peer-collect-feature-to-end-in-october-489244-2025-08-13">NPCI ends P2P collect</a></li>
+    <li><a href="https://www.cashfree.com/docs/payments/manage/payment-methods/upi-collect">Cashfree: UPI Collect changes</a></li>
+    <li><a href="https://razorpay.com/docs/payments/route/">Razorpay Route</a></li>
+    <li><a href="https://razorpay.com/docs/payments/business-types-kyc-documents/">Razorpay KYC documents</a></li>
+    <li><a href="https://taxguru.in/?p=1080802">TCS for e-commerce operators</a></li>
+  </ol>
+  <p>Unverified and marked as such above: Park+ refund terms and Play rating, PhonePe PG rates, gateway website requirements, and whether a new account needs Play's closed test.</p>
+</section>
+
+</div>

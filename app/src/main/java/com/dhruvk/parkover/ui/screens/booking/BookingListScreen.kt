@@ -1,5 +1,9 @@
 package com.dhruvk.parkover.ui.screens.booking
 
+import com.dhruvk.parkover.ui.components.OfflineNotice
+import com.dhruvk.parkover.ui.components.rememberDebouncedOffline
+import com.dhruvk.parkover.ui.components.rememberIsOnline
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -107,6 +111,7 @@ fun BookingListScreen(
         }
     }
 
+    val showOfflineNotice by rememberDebouncedOffline(rememberIsOnline().value)
     val upcoming = bookings.orEmpty().filter { AccountViewModel.isUpcoming(it) }.sortedBy { it.entryTime.toDate() }
     val past = bookings.orEmpty().filterNot { AccountViewModel.isUpcoming(it) }
     val list = if (showPast) past else upcoming
@@ -134,6 +139,11 @@ fun BookingListScreen(
                     SegmentTab("Upcoming · ${upcoming.size}", !showPast, Modifier.weight(1f)) { showPast = false }
                     SegmentTab("Past · ${past.size}", showPast, Modifier.weight(1f)) { showPast = true }
                 }
+            }
+
+            // Firestore keeps showing what it has offline and reconnects by itself: a calm notice is enough.
+            AnimatedVisibility(visible = showOfflineNotice) {
+                OfflineNotice(Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
             }
 
             when {

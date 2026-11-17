@@ -1,5 +1,10 @@
 package com.dhruvk.parkover.ui.screens.saved
 
+import com.dhruvk.parkover.ui.components.OfflineNotice
+import com.dhruvk.parkover.ui.components.rememberDebouncedOffline
+import com.dhruvk.parkover.ui.components.rememberIsOnline
+import androidx.compose.runtime.getValue
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,6 +89,7 @@ fun SavedScreen(
     onExplore: () -> Unit
 ) {
     val saved = accountViewModel.savedParkings.collectAsStateWithLifecycle().value
+    val showOfflineNotice by rememberDebouncedOffline(rememberIsOnline().value)
     val spots = (parkingViewModel.parkingSpots.collectAsStateWithLifecycle().value as? ApiResult.Success)?.data.orEmpty()
     val location = homeViewModel.location.collectAsStateWithLifecycle().value
     val snackbar = remember { SnackbarHostState() }
@@ -127,6 +133,11 @@ fun SavedScreen(
                         color = TextSecondary
                     )
                 }
+            }
+
+            // Firestore keeps showing what it has offline and reconnects by itself: a calm notice is enough.
+            AnimatedVisibility(visible = showOfflineNotice) {
+                OfflineNotice(Modifier.padding(horizontal = 20.dp).padding(bottom = 8.dp))
             }
 
             when {

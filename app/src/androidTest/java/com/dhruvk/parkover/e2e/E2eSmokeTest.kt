@@ -2,6 +2,8 @@ package com.dhruvk.parkover.e2e
 
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -129,25 +131,25 @@ class E2eSmokeTest {
     }
 
     @Test
-    fun E2E_05_realNetworkOff_atConfirm_nothingBooked_thenRecovers() {
+    fun E2E_05_realNetworkOff_atConfirm_confirmWaits_thenBooksOnce() {
         compose.openGovandiDetails()
         compose.fromDetailsToPayment()
         E2eRule.setNetwork(false)
         try {
-            Thread.sleep(3_000)
-            compose.confirmBooking()
-            compose.waitFor(hasText("nothing was booked", substring = true), NET_MS)
+            // Offline: choices stay on screen, a calm notice explains, Confirm can't be tapped.
+            compose.waitFor(hasText("You're offline"), NET_MS)
+            compose.onNode(hasText("Confirm booking", substring = true) and androidx.compose.ui.test.hasClickAction())
+                .assertIsNotEnabled()
         } finally {
             E2eRule.setNetwork(true)
         }
-        // Back online: nothing was queued behind the user's back…
         Thread.sleep(8_000)
-        assertTrue(myBookings().isEmpty())
-        // …and trying again works. Firestore may still be reconnecting, so like a driver we
-        // retry if it says offline again (each attempt must fail cleanly or succeed once).
+        assertTrue("nothing was booked while offline", myBookings().isEmpty())
+        // Back online: Confirm works (retry if Firestore is still reconnecting).
         var booked = false
         repeat(3) {
             if (booked) return@repeat
+            compose.waitUntil(NET_MS) { runCatching { compose.onNode(hasText("Confirm booking", substring = true) and androidx.compose.ui.test.hasClickAction()).assertIsEnabled() }.isSuccess }
             compose.confirmBooking()
             booked = runCatching { compose.waitFor(hasText("You're booked!"), 20_000) }.isSuccess
         }

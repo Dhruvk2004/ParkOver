@@ -100,14 +100,14 @@ class E2eOfflineLaunchTest {
     val rules: RuleChain = RuleChain.outerRule(e2e).around(compose).around(FailureArtifactsRule())
 
     @Test
-    fun NET_01_launchOffline_clearMessage_thenRetryWorks() {
+    fun NET_01_launchOffline_illustratedScreen_thenRecoversByItself() {
         E2eRule.allowLocationIfAsked(2_000)
-        compose.waitFor(hasText("PARKING NEAR YOU"), NET_MS)
-        compose.waitFor(hasText("Couldn't load parking", substring = true), NET_MS)
+        // Opened offline with nothing loaded: the full "no signal" screen, not a bare banner.
+        compose.waitFor(hasText("Stuck in a no-signal zone"), NET_MS)
         E2eRule.setNetwork(true)
-        Thread.sleep(6_000)
-        compose.clickText("Retry")
-        compose.waitUntil(NET_MS) { MapTestHooks.pinIds.isNotEmpty() }
+        // No tap needed: the app reloads parkings when the connection is back.
+        compose.waitUntil(60_000) { MapTestHooks.pinIds.isNotEmpty() }
+        compose.waitUntil(10_000) { !compose.exists(hasText("Stuck in a no-signal zone")) }
     }
 }
 
