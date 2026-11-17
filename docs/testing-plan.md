@@ -340,6 +340,8 @@ Status (14 Nov): risks 1–4 are **fixed** in code and rules, covered by `firest
 
 ## 7. Commands
 
+**CI** (`.github/workflows/ci.yml`, free because the repo is public): on every push and pull request GitHub runs the unit tests (debug + release), compiles the device/E2E tests, and runs the rules and load tests on the emulator. Device and E2E tests run on a developer machine with a phone.
+
 ```bash
 # Layer 1: JVM unit tests (app/src/test)
 ./gradlew testDebugUnitTest

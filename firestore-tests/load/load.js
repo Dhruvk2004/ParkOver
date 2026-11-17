@@ -79,7 +79,7 @@ const scenarios = {
 
   // LOAD-02: 100 drivers, 20 parkings × 10 bays, 45 s of book / cancel / extend churn.
   async sustained() {
-    const P = 20, CAP = 10, D = 100, SECONDS = Number(process.env.SECONDS ?? 45);
+    const P = 20, CAP = 10, D = 100, SECONDS = Number(process.env.LOAD_SECONDS ?? 45);
     const capacity = Object.fromEntries(Array.from({ length: P }, (_, p) => [`p${p}`, CAP]));
     const cap = { type: CAP, floor: CAP };
     const lat = { create: [], cancel: [], extend: [] }, outcomes = {};
