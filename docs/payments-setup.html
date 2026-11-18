@@ -1,0 +1,192 @@
+<title>ParkOver Payments Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: one readable column, each part a numbered checklist you tick as you go */
+:root {
+  --bg: #F7F6FB; --surface: #FFFFFF; --fg: #1F2937; --muted: #5B6170; --line: #E4E2EE;
+  --accent: #613EEA; --accent-ink: #4A2BC7; --accent-soft: #F1EDFD;
+  --warn-bg: #FFF7E6; --warn-fg: #8A4B08; --ok-bg: #E9F8EF; --ok-fg: #166534;
+  --code-bg: #F1F0F6;
+  --display: "Jost", "Avenir Next", system-ui, sans-serif;
+  --body: "Inter", system-ui, -apple-system, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13101F; --surface: #1C1830; --fg: #ECEAF5; --muted: #A7A3BA; --line: #2E2945;
+  --accent: #8E73F7; --accent-ink: #B7A6FF; --accent-soft: #261F45;
+  --warn-bg: #2E2410; --warn-fg: #F5C878; --ok-bg: #12291C; --ok-fg: #86E0A6; --code-bg: #241F3A; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13101F; --surface: #1C1830; --fg: #ECEAF5; --muted: #A7A3BA; --line: #2E2945;
+  --accent: #8E73F7; --accent-ink: #B7A6FF; --accent-soft: #261F45;
+  --warn-bg: #2E2410; --warn-fg: #F5C878; --ok-bg: #12291C; --ok-fg: #86E0A6; --code-bg: #241F3A; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 760px; margin: 0 auto; padding-block: 40px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+h1 { font-size: 34px; line-height: 1.15; font-weight: 700; }
+h2 { font-size: 22px; font-weight: 600; }
+h3 { font-size: 16px; font-weight: 600; }
+p { margin: 0; }
+a { color: var(--accent-ink); }
+.lede { color: var(--muted); font-size: 16px; max-width: 62ch; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--accent-ink); }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.node { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; font-weight: 500; }
+.node b { color: var(--accent-ink); }
+.arrow { color: var(--muted); font-size: 13px; }
+section.part { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.part-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px; }
+.time { font-size: 13px; color: var(--muted); }
+ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; counter-reset: s; }
+ol.steps li { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 12px; align-items: start; }
+ol.steps input[type=checkbox] { width: 20px; height: 20px; margin: 3px 0 0; accent-color: var(--accent); }
+ol.steps label { display: flex; flex-direction: column; gap: 6px; min-width: 0; cursor: pointer; }
+ol.steps label > span:first-child { font-weight: 600; }
+.done label > span:first-child { text-decoration: line-through; color: var(--muted); }
+.note { font-size: 14px; color: var(--muted); }
+code { font-family: var(--mono); font-size: 13px; background: var(--code-bg); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; }
+.cmd { display: flex; align-items: center; gap: 8px; background: var(--code-bg); border-radius: 10px; padding: 8px 8px 8px 12px; min-width: 0; }
+.cmd code { background: none; padding: 0; flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; }
+.copy { font: 600 12px var(--body); border: 1px solid var(--line); background: var(--surface); color: var(--accent-ink); border-radius: 8px; padding: 6px 10px; cursor: pointer; flex-shrink: 0; }
+.copy:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.callout { border-radius: 12px; padding: 14px 16px; font-size: 14px; }
+.warn { background: var(--warn-bg); color: var(--warn-fg); }
+.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--display); font-weight: 600; font-size: 13px; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+.pill { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pill.secret { background: var(--warn-bg); color: var(--warn-fg); }
+.pill.public { background: var(--ok-bg); color: var(--ok-fg); }
+.progress { font-size: 13px; color: var(--muted); }
+ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <span class="eyebrow">ParkOver · your part of the setup</span>
+    <h1>Razorpay and Cloudflare setup</h1>
+    <p class="lede">Three free accounts' worth of clicks, about 25 minutes. Nothing here needs a card, a bank account, GPay or a business. Tick each step as you go; ticks are saved in this browser only.</p>
+    <p class="progress" id="progress">0 of 14 steps done</p>
+  </header>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>How a payment will flow</h2>
+    <div class="flow" aria-label="Payment flow">
+      <span class="node"><b>App</b> asks for an order</span><span class="arrow">→</span>
+      <span class="node"><b>Worker</b> creates it with the secret key</span><span class="arrow">→</span>
+      <span class="node"><b>Razorpay</b> checkout opens in the app</span><span class="arrow">→</span>
+      <span class="node"><b>Worker</b> checks the payment signature</span><span class="arrow">→</span>
+      <span class="node"><b>Firestore</b> booking marked paid</span>
+    </div>
+    <p class="note">The Worker is a tiny free server on Cloudflare. It exists so the Razorpay secret key never sits inside the app, where anyone could pull it out of the APK.</p>
+  </section>
+
+  <section class="part" id="razorpay">
+    <div class="part-head"><h2>Part 1 · Razorpay test account</h2><span class="time">about 10 min</span></div>
+    <ol class="steps">
+      <li><input type="checkbox" id="s1"><label for="s1"><span>Sign up</span><span class="note">Go to <a href="https://dashboard.razorpay.com/signup">dashboard.razorpay.com/signup</a> and create an account with your email and phone. When it asks for business details or KYC, skip it. Test mode works without activation.</span></label></li>
+      <li><input type="checkbox" id="s2"><label for="s2"><span>Switch to Test Mode</span><span class="note">Use the Test / Live switch at the top of the dashboard. Everything below is done in Test Mode.</span></label></li>
+      <li><input type="checkbox" id="s3"><label for="s3"><span>Generate test API keys</span><span class="note">Account &amp; Settings → API Keys → Generate Test Key. You get a <b>Key ID</b> (starts with <code>rzp_test_</code>) and a <b>Key Secret</b>. The secret is shown once: download or copy it somewhere safe, like a password manager.</span></label></li>
+      <li><input type="checkbox" id="s4"><label for="s4"><span>Put the Key ID in the app config</span><span class="note">Add this line to <code>local.properties</code> in the project (the git-ignored file that already holds your ORS key):</span><div class="cmd"><code>RAZORPAY_KEY_ID=rzp_test_xxxxxxxx</code><button class="copy" type="button" data-copy="RAZORPAY_KEY_ID=rzp_test_xxxxxxxx">Copy</button></div><span class="note">Only the Key ID. The Key Secret never goes in this file.</span></label></li>
+    </ol>
+  </section>
+
+  <section class="part" id="firebase">
+    <div class="part-head"><h2>Part 2 · Firebase key for the Worker</h2><span class="time">about 3 min</span></div>
+    <p class="note">The Worker marks bookings as paid, so it needs its own login to your Firebase project (<code>parkover-b042b</code>).</p>
+    <ol class="steps">
+      <li><input type="checkbox" id="s5"><label for="s5"><span>Create a service account key</span><span class="note">Firebase console → Project settings (gear) → Service accounts → Generate new private key. A <code>.json</code> file downloads.</span></label></li>
+      <li><input type="checkbox" id="s6"><label for="s6"><span>Keep the file out of the project</span><span class="note">Leave it in Downloads or a private folder. Never move it into the ParkOver folder, never commit it, and never paste it into a chat.</span></label></li>
+    </ol>
+  </section>
+
+  <section class="part" id="cloudflare">
+    <div class="part-head"><h2>Part 3 · Cloudflare Workers</h2><span class="time">about 10 min</span></div>
+    <ol class="steps">
+      <li><input type="checkbox" id="s7"><label for="s7"><span>Create a free account</span><span class="note">Sign up at <a href="https://dash.cloudflare.com/sign-up">dash.cloudflare.com/sign-up</a> and verify your email. The Workers free plan needs no card and allows 100,000 requests a day.</span></label></li>
+      <li><input type="checkbox" id="s8"><label for="s8"><span>Pick your workers.dev name</span><span class="note">Open Workers &amp; Pages once in the dashboard. Cloudflare asks you to choose a subdomain; your Worker will live at <code>parkover-payments.&lt;that-name&gt;.workers.dev</code>.</span></label></li>
+      <li><input type="checkbox" id="s9"><label for="s9"><span>Log the command line in</span><span class="note">In a terminal (Node is already installed for the Firestore tests). A browser tab opens; approve it.</span><div class="cmd"><code>npx wrangler login</code><button class="copy" type="button" data-copy="npx wrangler login">Copy</button></div></label></li>
+    </ol>
+    <div class="callout warn">Stop here until I've added the <code>payments-worker</code> folder to the repo. The next steps run inside it.</div>
+    <ol class="steps">
+      <li><input type="checkbox" id="s10"><label for="s10"><span>Store the Razorpay secret in the Worker</span><span class="note">Run from the <code>payments-worker</code> folder. It asks you to paste the value; it's stored encrypted on Cloudflare, never in a file.</span><div class="cmd"><code>npx wrangler secret put RAZORPAY_KEY_SECRET</code><button class="copy" type="button" data-copy="npx wrangler secret put RAZORPAY_KEY_SECRET">Copy</button></div></label></li>
+      <li><input type="checkbox" id="s11"><label for="s11"><span>Store the Key ID too</span><div class="cmd"><code>npx wrangler secret put RAZORPAY_KEY_ID</code><button class="copy" type="button" data-copy="npx wrangler secret put RAZORPAY_KEY_ID">Copy</button></div></label></li>
+      <li><input type="checkbox" id="s12"><label for="s12"><span>Store the Firebase key</span><span class="note">Pipes the downloaded JSON straight in; change the path to where your file is.</span><div class="cmd"><code>npx wrangler secret put FIREBASE_SERVICE_ACCOUNT &lt; ~/Downloads/parkover-b042b-xxxx.json</code><button class="copy" type="button" data-copy="npx wrangler secret put FIREBASE_SERVICE_ACCOUNT < ~/Downloads/parkover-b042b-xxxx.json">Copy</button></div></label></li>
+      <li><input type="checkbox" id="s13"><label for="s13"><span>Deploy</span><span class="note">It prints the Worker's URL when done.</span><div class="cmd"><code>npx wrangler deploy</code><button class="copy" type="button" data-copy="npx wrangler deploy">Copy</button></div></label></li>
+      <li><input type="checkbox" id="s14"><label for="s14"><span>Give the app the Worker's URL</span><span class="note">Add to <code>local.properties</code>, then tell me "Worker deployed" and I'll wire it up and test.</span><div class="cmd"><code>PAYMENTS_URL=https://parkover-payments.your-name.workers.dev</code><button class="copy" type="button" data-copy="PAYMENTS_URL=https://parkover-payments.your-name.workers.dev">Copy</button></div></label></li>
+    </ol>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>Where each value goes</h2>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Value</th><th>Goes in</th><th>Kind</th></tr></thead>
+        <tbody>
+          <tr><td>Razorpay Key ID <code>rzp_test_…</code></td><td><code>local.properties</code> and a Worker secret</td><td><span class="pill public">OK in the app</span></td></tr>
+          <tr><td>Razorpay Key Secret</td><td>Worker secret only</td><td><span class="pill secret">Never in app or git</span></td></tr>
+          <tr><td>Firebase service account JSON</td><td>Worker secret only</td><td><span class="pill secret">Never in app or git</span></td></tr>
+          <tr><td>Worker URL</td><td><code>local.properties</code></td><td><span class="pill public">OK in the app</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout warn">Don't paste the Key Secret or the JSON file into our chat. Put them straight into the commands above; I never need to see them.</div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>Paying in test mode</h2>
+    <p>Razorpay's checkout looks real but moves no money. In the UPI option, type one of these IDs to choose the result:</p>
+    <ul class="plain">
+      <li><code>success@razorpay</code> · the payment succeeds</li>
+      <li><code>failure@razorpay</code> · the payment fails, so you can see the error screen</li>
+    </ul>
+    <p class="note">For cards, Razorpay publishes test card numbers in its docs: search "Razorpay test card details". Any future expiry date and any CVV work.</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>What I build once you're done</h2>
+    <ul class="plain">
+      <li>The <code>payments-worker</code> folder: create-order and verify-payment routes, plus a webhook route for later.</li>
+      <li>Razorpay checkout in the app, with the bay held while the driver pays.</li>
+      <li>Booking status set to paid only by the Worker, enforced in the Firestore rules.</li>
+      <li>Refunds for cancellations and "didn't come", through the same Worker.</li>
+    </ul>
+    <div class="callout ok">All of this stays free: Razorpay test mode costs nothing, and the Workers free plan covers far more than a prototype will use.</div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('ol.steps input[type=checkbox]'));
+  var progress = document.getElementById('progress');
+  function load() { try { return JSON.parse(localStorage.getItem('po-setup') || '{}'); } catch (e) { return {}; } }
+  function save(s) { try { localStorage.setItem('po-setup', JSON.stringify(s)); } catch (e) {} }
+  var state = load();
+  function render() {
+    var n = 0;
+    boxes.forEach(function (b) { b.closest('li').classList.toggle('done', b.checked); if (b.checked) n++; });
+    progress.textContent = n + ' of ' + boxes.length + ' steps done';
+  }
+  boxes.forEach(function (b) {
+    b.checked = !!state[b.id];
+    b.addEventListener('change', function () { state[b.id] = b.checked; save(state); render(); });
+  });
+  render();
+  document.querySelectorAll('.copy').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy');
+      var done = function () { btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy'; }, 1500); };
+      var fallback = function () {
+        var code = btn.parentNode.querySelector('code');
+        var r = document.createRange(); r.selectNodeContents(code);
+        var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        btn.textContent = 'Selected';
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+    });
+  });
+})();
+</script>
