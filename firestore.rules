@@ -23,6 +23,22 @@ service cloud.firestore {
       return getAfter(lockPath(b.parkingId, b.spotNumber, bucket)).data.bookingId == bookingId;
     }
 
+    // Operators run one parking place each. ParkOver writes operators/{uid} by hand in the
+    // console; nobody can make themselves an operator from the app.
+    function operatorPath() { return docPath('operators', request.auth.uid); }
+    function isOperatorOf(parkingId) {
+      return signedIn() && exists(operatorPath()) && get(operatorPath()).data.parkingId == parkingId;
+    }
+    // A time the phone stamped, within 10 minutes of the server's clock.
+    function isNow(ts) {
+      return ts is timestamp && ts > request.time - duration.value(10, 'm') && ts < request.time + duration.value(10, 'm');
+    }
+
+    match /operators/{uid} {
+      allow read: if isUser(uid);
+      allow write: if false;
+    }
+
     // Profile, saved parkings and UPI IDs: only the owner.
     match /users/{uid} {
       allow read, write: if isUser(uid);
@@ -37,9 +53,10 @@ service cloud.firestore {
       allow create: if isUser(request.resource.data.userId);
     }
 
-    // Bookings are private to their owner. Which bays are taken is public via slot_locks.
+    // Bookings are private to their owner and the operator of that parking place.
+    // Which bays are taken is public via slot_locks.
     match /bookings/{bookingId} {
-      allow read: if isUser(resource.data.userId);
+      allow read: if isUser(resource.data.userId) || isOperatorOf(resource.data.parkingId);
 
       // A new booking must be active and hold the slot lock for its first and last bucket,
       // written in the same transaction, so a client can't skip the double-booking check.
@@ -50,17 +67,43 @@ service cloud.firestore {
                     && lockedBy(request.resource.data, bookingId, bucketOf(request.resource.data.entryTime))
                     && lockedBy(request.resource.data, bookingId, lastBucketOf(request.resource.data.exitTime));
 
-      // Owner can change an active booking (cancel, extend) but not move it or reopen it.
+      // Owner can change an active booking (cancel, extend) but not move it, reopen it, or
+      // check themselves in or out: only the operator moves a booking past "Booked".
       allow update: if isUser(resource.data.userId)
                     && isActive(resource.data.bookingStatus)
+                    && request.resource.data.bookingStatus in [resource.data.bookingStatus, 'CANCELLED']
                     && request.resource.data.diff(resource.data).unchangedKeys().hasAll(
                          ['id', 'userId', 'parkingId', 'spotNumber', 'floorNumber', 'vehicleType', 'entryTime', 'createdAt'])
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(
+                         ['checkedInAt', 'actualExitTime', 'extraCharges', 'walkIn'])
                     && request.resource.data.exitTime >= resource.data.exitTime
                     // Extending must lock the new end of the stay in the same write.
                     && (request.resource.data.exitTime == resource.data.exitTime
                         || lockedBy(request.resource.data, bookingId, lastBucketOf(request.resource.data.exitTime)));
 
+      // The operator of the parking place checks cars in and out.
+      allow update: if isOperatorOf(resource.data.parkingId)
+                    && (operatorCheckIn(resource.data, request.resource.data)
+                        || operatorCheckOut(resource.data, request.resource.data));
+
       allow delete: if false;
+    }
+
+    // Booked → Arrived.
+    function operatorCheckIn(before, after) {
+      return before.bookingStatus in ['PENDING', 'CONFIRMED']
+          && after.bookingStatus == 'ACTIVE'
+          && after.diff(before).affectedKeys().hasOnly(['bookingStatus', 'checkedInAt', 'updatedAt'])
+          && isNow(after.checkedInAt);
+    }
+
+    // Arrived → Exited, with any overstay charge.
+    function operatorCheckOut(before, after) {
+      return before.bookingStatus == 'ACTIVE'
+          && after.bookingStatus == 'COMPLETED'
+          && after.diff(before).affectedKeys().hasOnly(['bookingStatus', 'actualExitTime', 'extraCharges', 'updatedAt'])
+          && isNow(after.actualExitTime)
+          && after.extraCharges is number && after.extraCharges >= 0;
     }
 
     // One document per bay per 30-minute bucket. Its existence means "taken".
@@ -72,7 +115,10 @@ service cloud.firestore {
                     && request.resource.data.bucket is int
                     && lockId == request.resource.data.parkingId + '_' + request.resource.data.spotNumber + '_'
                                  + string(request.resource.data.bucket);
-      allow delete: if isUser(resource.data.userId);
+      // The owner frees their own bay; the operator frees the rest of a stay at check-out.
+      allow delete: if isUser(resource.data.userId)
+                    || (isOperatorOf(resource.data.parkingId)
+                        && getAfter(docPath('bookings', resource.data.bookingId)).data.bookingStatus == 'COMPLETED');
       allow update: if false;
     }
 
@@ -100,7 +146,7 @@ service cloud.firestore {
       let ref = docPath('bookings', d.lastBookingId);
       let after = getAfter(ref).data;
       let existed = exists(ref);
-      return after.userId == request.auth.uid
+      return (after.userId == request.auth.uid || isOperatorOf(after.parkingId))
           && d.parkingId == after.parkingId
           && d.bucket is int
           && docId == after.parkingId + '_' + string(d.bucket)
@@ -108,16 +154,20 @@ service cloud.firestore {
     }
 
     // (Split from validOccupancyChange: rules allow at most 10 variables per function.)
+    // A check-out gives back the slots after the one the car left in.
     function validSlotChange(d, old, after, before, existed) {
       let created = !existed && isActive(after.bookingStatus);
       let cancelled = existed && isActive(before.bookingStatus) && after.bookingStatus == 'CANCELLED';
+      let checkedOut = existed && before.bookingStatus == 'ACTIVE' && after.bookingStatus == 'COMPLETED';
       let extended = existed && isActive(before.bookingStatus) && isActive(after.bookingStatus)
                      && after.exitTime > before.exitTime;
-      let delta = cancelled ? -1 : 1;
+      let freed = cancelled || checkedOut;
+      let delta = freed ? -1 : 1;
+      let first = extended ? lastBucketOf(before.exitTime) + 1
+                  : (checkedOut ? bucketOf(after.actualExitTime) + 1 : bucketOf(after.entryTime));
+      let last = freed ? lastBucketOf(before.exitTime) : lastBucketOf(after.exitTime);
       let type = after.vehicleType;
-      let first = extended ? lastBucketOf(before.exitTime) + 1 : bucketOf(after.entryTime);
-      let last = cancelled ? lastBucketOf(before.exitTime) : lastBucketOf(after.exitTime);
-      return (created || cancelled || extended)
+      return (created || freed || extended)
           && d.bucket >= first && d.bucket <= last
           && d.diff(old).affectedKeys().hasOnly([type, 'floors', 'lastBookingId', 'lastUpdated', 'parkingId', 'bucket'])
           && d.get(type, 0) == old.get(type, 0) + delta

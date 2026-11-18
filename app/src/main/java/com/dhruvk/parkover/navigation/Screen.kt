@@ -7,6 +7,16 @@ sealed class Screen(val route: String) {
     object Login : Screen("login")
     object SignUp : Screen("signup")
 
+    // Decides driver or operator after sign-in (the account decides the role)
+    object RoleGate : Screen("role_gate")
+
+    // Operator side: Today / Bays / Account, the QR scanner and one booking
+    object Operator : Screen("operator")
+    object OperatorScan : Screen("operator_scan")
+    object OperatorBooking : Screen("operator_booking/{bookingId}") {
+        fun createRoute(bookingId: String) = "operator_booking/$bookingId"
+    }
+
     // Main shell with the bottom-nav tabs (one instance; tabs keep their own state)
     object Main : Screen("main?tab={tab}") {
         fun createRoute(tab: Tab = Tab.Home) = "main?tab=${tab.route}"

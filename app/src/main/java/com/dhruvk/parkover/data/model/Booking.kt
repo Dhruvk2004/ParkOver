@@ -27,8 +27,12 @@ data class Booking(
     val bookingStatus: BookingStatus = BookingStatus.PENDING,
     val qrCodeData: String = "",
     val transactionId: String? = null,
-    val extraCharges: Double = 0.0, // For overstay
-    val actualExitTime: Timestamp? = null,
+    val extraCharges: Double = 0.0, // Overstay, worked out at check-out
+    val actualExitTime: Timestamp? = null, // When the operator checked the car out
+    val checkedInAt: Timestamp? = null, // When the operator marked the car arrived
+    val driverName: String = "", // Denormalized so the operator sees who is coming
+    val walkIn: Boolean = false, // Bay blocked by the operator (walk-in car, repair, staff)
+    val blockReason: String? = null,
     val createdAt: Timestamp = Timestamp.now(),
     val updatedAt: Timestamp = Timestamp.now()
 ) {
@@ -61,11 +65,15 @@ enum class PaymentStatus {
     REFUNDED
 }
 
+/**
+ * Booked → Arrived → Exited, or Didn't come. Only the parking's operator moves a booking past
+ * Booked (check-in, check-out, didn't come); the driver can only cancel.
+ */
 enum class BookingStatus {
     PENDING,    // Booking created, payment pending
-    CONFIRMED,  // Payment done, waiting for entry time
-    ACTIVE,     // Currently parked
-    COMPLETED,  // Exited parking
-    CANCELLED,  // User cancelled
-    EXPIRED     // User didn't show up
+    CONFIRMED,  // "Booked": waiting for the driver to arrive
+    ACTIVE,     // "Arrived": the operator checked the car in; it's parked
+    COMPLETED,  // "Exited": the operator checked the car out
+    CANCELLED,  // The driver cancelled
+    EXPIRED     // "Didn't come": marked by the operator after trying to reach the driver
 }

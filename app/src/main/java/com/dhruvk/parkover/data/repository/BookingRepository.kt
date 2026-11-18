@@ -173,6 +173,7 @@ class BookingRepository(
             id = bookingId,
             userId = userId,
             qrCodeData = "PARKOVER:$bookingId",
+            driverName = booking.driverName.ifBlank { auth.currentUser?.displayName.orEmpty() },
             createdAt = Timestamp.now(),
             updatedAt = Timestamp.now()
         )
@@ -331,13 +332,13 @@ class BookingRepository(
 
     // ---------- Occupancy ----------
 
-    private fun occupiedCount(snap: DocumentSnapshot, type: String): Long = if (snap.exists()) snap.getLong(type) ?: 0 else 0
+    internal fun occupiedCount(snap: DocumentSnapshot, type: String): Long = if (snap.exists()) snap.getLong(type) ?: 0 else 0
 
-    private fun occupiedFloor(snap: DocumentSnapshot, floorKey: String): Long =
+    internal fun occupiedFloor(snap: DocumentSnapshot, floorKey: String): Long =
         if (snap.exists()) (snap.get(FieldPath.of("floors", floorKey)) as? Number)?.toLong() ?: 0 else 0
 
     /** +1/-1 on one slot for one booking (its type and floor), creating the slot doc if needed. */
-    private fun writeOccupancy(
+    internal fun writeOccupancy(
         transaction: Transaction, snap: DocumentSnapshot, parkingId: String, bucket: Long,
         type: String, floorKey: String, delta: Long, bookingId: String
     ) {
@@ -366,7 +367,7 @@ class BookingRepository(
      * back, so a driver who gave up at a spinner could still end up booked. Check the server is
      * reachable first and fail fast instead. [ref] must be a document this user may read.
      */
-    private suspend fun requireServer(ref: com.google.firebase.firestore.DocumentReference) {
+    internal suspend fun requireServer(ref: com.google.firebase.firestore.DocumentReference) {
         val offline = FirebaseFirestoreException("Offline", FirebaseFirestoreException.Code.UNAVAILABLE)
         val result = withTimeoutOrNull(ONLINE_CHECK_MS) {
             runCatching { ref.get(com.google.firebase.firestore.Source.SERVER).await() }
@@ -382,7 +383,7 @@ class BookingRepository(
      * our read and commit. Run it again (it re-reads) so the driver gets the real outcome
      * ("just booked", "full") or success, not a generic refusal. A real refusal fails 3 times.
      */
-    private suspend fun <T> retryIfRefused(block: suspend () -> T): T {
+    internal suspend fun <T> retryIfRefused(block: suspend () -> T): T {
         repeat(2) {
             try {
                 return block()
@@ -395,7 +396,7 @@ class BookingRepository(
         return block()
     }
 
-    private fun lockData(parkingId: String, spotNumber: String, bucket: Long, bookingId: String, userId: String) = mapOf(
+    internal fun lockData(parkingId: String, spotNumber: String, bucket: Long, bookingId: String, userId: String) = mapOf(
         "parkingId" to parkingId,
         "spotNumber" to spotNumber,
         "bucket" to bucket,

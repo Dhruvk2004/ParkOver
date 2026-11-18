@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.DirectionsCar
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.PhotoLibrary
 import androidx.compose.material3.AlertDialog
@@ -103,7 +104,9 @@ fun ProfileScreen(
     onPaymentMethods: () -> Unit = {},
     onHelpSupport: () -> Unit = {},
     onBookings: () -> Unit = {},
-    onSaved: () -> Unit = {}
+    onSaved: () -> Unit = {},
+    /** Set for operator accounts browsing as a driver: takes them back to their parking place. */
+    onOperatorMode: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val authUser = FirebaseAuth.getInstance().currentUser
@@ -230,6 +233,17 @@ fun ProfileScreen(
                 CountTile(Icons.Rounded.CalendarMonth, bookings?.size?.toString() ?: "–", "Bookings", Modifier.weight(1f), onBookings)
                 CountTile(Icons.Rounded.Bookmark, savedIds.size.toString(), "Saved", Modifier.weight(1f), onSaved)
                 CountTile(Icons.Rounded.DirectionsCar, vehicles.size.toString(), "Vehicles", Modifier.weight(1f), onSavedVehicles)
+            }
+
+            if (onOperatorMode != null) {
+                ParkCard(contentPadding = PaddingValues(0.dp)) {
+                    MenuRow(
+                        icon = Icons.Rounded.Storefront,
+                        title = "Back to operator mode",
+                        subtitle = "Today's bookings and bays at your parking place",
+                        onClick = onOperatorMode
+                    )
+                }
             }
 
             SectionLabel("Account", Modifier.padding(top = 4.dp))

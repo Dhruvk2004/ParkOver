@@ -9,8 +9,26 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.dhruvk.parkover.ui.screens.operator.OperatorBookingScreen
+import com.dhruvk.parkover.ui.screens.operator.OperatorShell
+import com.dhruvk.parkover.ui.screens.operator.ScanScreen
+import com.dhruvk.parkover.ui.theme.BackgroundLight
+import com.dhruvk.parkover.ui.theme.Purple
+import com.dhruvk.parkover.viewmodels.OperatorViewModel
+import com.dhruvk.parkover.viewmodels.RoleState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -69,6 +87,41 @@ fun ParkOverNavGraph(
     val accountViewModel: AccountViewModel = viewModel()
     val vehicleViewModel: VehicleViewModel = viewModel()
     val homeViewModel: HomeViewModel = viewModel()
+    val operatorViewModel: OperatorViewModel = viewModel()
+    val role by operatorViewModel.role.collectAsState()
+
+    // Operator actions report back here, whichever operator screen is showing.
+    val context = LocalContext.current
+    val operatorMessage by operatorViewModel.message.collectAsState()
+    LaunchedEffect(operatorMessage) {
+        operatorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            operatorViewModel.clearMessage()
+        }
+    }
+
+    /** After sign-in: the account decides whether this is a driver or an operator. */
+    fun goHome() {
+        navController.navigate(Screen.RoleGate.route) {
+            popUpTo(0) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    fun goToOperator() {
+        navController.navigate(Screen.Operator.route) {
+            popUpTo(0) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
+    fun logOut() {
+        authViewModel.signOut()
+        operatorViewModel.signedOut()
+        navController.navigate(Screen.Login.route) {
+            popUpTo(0) { inclusive = true }
+        }
+    }
 
     fun goToMain(tab: Tab = Tab.Home) {
         navController.navigate(Screen.Main.createRoute(tab)) {
@@ -92,7 +145,7 @@ fun ParkOverNavGraph(
             exitTransition = { fadeOut(tween(250)) }
         ) {
             SplashScreen(
-                onNavigateToMain = { goToMain() },
+                onNavigateToMain = { goHome() },
                 onNavigateToStart = {
                     navController.navigate(Screen.Start.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
@@ -111,7 +164,7 @@ fun ParkOverNavGraph(
         composable(Screen.Login.route) {
             LoginScreen(
                 viewModel = authViewModel,
-                onLoginSuccess = { goToMain() },
+                onLoginSuccess = { goHome() },
                 onNavigateToSignUp = {
                     navController.navigate(Screen.SignUp.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -123,12 +176,66 @@ fun ParkOverNavGraph(
         composable(Screen.SignUp.route) {
             SignUpScreen(
                 viewModel = authViewModel,
-                onSignUpSuccess = { goToMain() },
+                onSignUpSuccess = { goHome() },
                 onNavigateToLogin = {
                     navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.SignUp.route) { inclusive = true }
                     }
                 }
+            )
+        }
+
+        // ---------- Role ----------
+        composable(Screen.RoleGate.route, enterTransition = { fadeIn(tween(150)) }) {
+            LaunchedEffect(Unit) {
+                when (operatorViewModel.checkRole()) {
+                    is RoleState.Operator -> goToOperator()
+                    else -> goToMain()
+                }
+            }
+            Box(Modifier.fillMaxSize().background(BackgroundLight), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = Purple)
+            }
+        }
+
+        // ---------- Operator ----------
+        composable(Screen.Operator.route, enterTransition = { fadeIn(tween(NAV_MS)) }) {
+            val profile = (role as? RoleState.Operator)?.profile
+            if (profile == null) {
+                LaunchedEffect(Unit) { goHome() }
+            } else {
+                OperatorShell(
+                    profile = profile,
+                    viewModel = operatorViewModel,
+                    onScan = { navController.navigate(Screen.OperatorScan.route) },
+                    onOpenBooking = { navController.navigate(Screen.OperatorBooking.createRoute(it)) },
+                    onDriverMode = { goToMain() },
+                    onLogout = ::logOut
+                )
+            }
+        }
+
+        composable(Screen.OperatorScan.route) {
+            ScanScreen(
+                viewModel = operatorViewModel,
+                parkingId = operatorViewModel.profile()?.parkingId.orEmpty(),
+                onClose = { navController.navigateUp() },
+                onOpenBooking = { id ->
+                    navController.navigate(Screen.OperatorBooking.createRoute(id)) {
+                        popUpTo(Screen.OperatorScan.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Screen.OperatorBooking.route,
+            arguments = listOf(navArgument("bookingId") { type = NavType.StringType })
+        ) { entry ->
+            OperatorBookingScreen(
+                bookingId = entry.arguments?.getString("bookingId").orEmpty(),
+                viewModel = operatorViewModel,
+                onBack = { navController.navigateUp() }
             )
         }
 
@@ -145,7 +252,8 @@ fun ParkOverNavGraph(
                 vehicleViewModel = vehicleViewModel,
                 homeViewModel = homeViewModel,
                 navController = navController,
-                initialTab = Tab.fromRoute(entry.arguments?.getString("tab"))
+                initialTab = Tab.fromRoute(entry.arguments?.getString("tab")),
+                onOperatorMode = if (role is RoleState.Operator) ({ goToOperator() }) else null
             )
         }
 

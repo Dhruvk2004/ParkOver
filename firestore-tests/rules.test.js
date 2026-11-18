@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, runTransaction, Timestamp, increment } from 'firebase/firestore';
-import { HOUR, bucketOf, lockBuckets, lockId, lockData, occupancyId, futureStart, createBooking, cancelBooking, extendBooking } from './booking.js';
+import { HOUR, bucketOf, lockBuckets, lockId, lockData, occupancyId, futureStart, createBooking, cancelBooking, extendBooking, checkIn, checkOut } from './booking.js';
 
 const PARKING = 'p1';
 let env;
@@ -259,4 +259,108 @@ test('SEC-01/02 users and vehicles stay private', async () => {
 test('SEC-08 support tickets cannot spoof another user', async () => {
   await assertFails(setDoc(doc(db('mallory'), 'support_tickets', 't1'), { userId: 'alice', message: 'hi' }));
   await assertSucceeds(setDoc(doc(db('alice'), 'support_tickets', 't2'), { userId: 'alice', message: 'hi' }));
+});
+
+// ---- OP: operator mode (check-in, check-out, blocking bays) ----
+
+const nowStart = () => bucketOf(Date.now()) * 30 * 60_000; // top of this half hour
+async function makeOperator(uid, parkingId = PARKING) {
+  await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), 'operators', uid), { parkingId, name: 'Suresh', parkingName: 'Govandi' }));
+}
+
+test('OP-01 operator reads their own parking place\'s bookings, nobody else\'s', async () => {
+  await makeOperator('op');
+  await makeOperator('op2', 'p2');
+  const b = await createBooking(db('alice'), 'alice');
+  await createBooking(db('bob'), 'bob', { parkingId: 'p2', spot: 'L1-05' });
+  const mine = await assertSucceeds(getDocs(query(collection(db('op'), 'bookings'), where('parkingId', '==', PARKING))));
+  assert.equal(mine.size, 1);
+  await assertSucceeds(getDoc(doc(db('op'), 'bookings', b.id)));
+  await assertFails(getDoc(doc(db('op2'), 'bookings', b.id)));
+  await assertFails(getDocs(query(collection(db('op'), 'bookings'), where('parkingId', '==', 'p2'))));
+  await assertFails(getDoc(doc(db('bob'), 'bookings', b.id)));
+});
+
+test('OP-02 nobody can make themselves an operator', async () => {
+  await assertFails(setDoc(doc(db('mallory'), 'operators', 'mallory'), { parkingId: PARKING }));
+  await makeOperator('op');
+  await assertSucceeds(getDoc(doc(db('op'), 'operators', 'op')));
+  await assertFails(getDoc(doc(db('alice'), 'operators', 'op')));
+  await assertFails(updateDoc(doc(db('op'), 'operators', 'op'), { parkingId: 'p2' }));
+});
+
+test('OP-03 only the parking place\'s operator checks a car in', async () => {
+  await makeOperator('op');
+  await makeOperator('op2', 'p2');
+  const b = await createBooking(db('alice'), 'alice');
+  await assertFails(checkIn(db('alice'), b.id)); // The driver can't check themselves in
+  await assertFails(checkIn(db('op2'), b.id)); // Another parking place's operator can't either
+  await assertSucceeds(checkIn(db('op'), b.id));
+  assert.equal((await adminRead(`bookings/${b.id}`)).bookingStatus, 'ACTIVE');
+  await assert.rejects(checkIn(db('op'), b.id), /Not waiting/);
+});
+
+test('OP-04 a check-in cannot change anything else', async () => {
+  await makeOperator('op');
+  const b = await createBooking(db('alice'), 'alice');
+  const now = Timestamp.now();
+  await assertFails(updateDoc(doc(db('op'), 'bookings', b.id), { bookingStatus: 'ACTIVE', checkedInAt: now, spotNumber: 'L1-09' }));
+  await assertFails(updateDoc(doc(db('op'), 'bookings', b.id), { bookingStatus: 'COMPLETED', actualExitTime: now, extraCharges: 0 }));
+  await assertFails(updateDoc(doc(db('op'), 'bookings', b.id), { bookingStatus: 'ACTIVE', checkedInAt: Timestamp.fromMillis(Date.now() - 3 * HOUR) }));
+});
+
+test('OP-05 check-out frees the rest of the stay (locks and occupancy)', async () => {
+  await makeOperator('op');
+  const start = nowStart();
+  const b = await createBooking(db('alice'), 'alice', { start, hours: 2 });
+  await checkIn(db('op'), b.id);
+  await assertSucceeds(checkOut(db('op'), b.id, 0));
+  const saved = await adminRead(`bookings/${b.id}`);
+  assert.equal(saved.bookingStatus, 'COMPLETED');
+  assert.ok(saved.actualExitTime);
+  const now = bucketOf(Date.now());
+  assert.equal(cars(await occAt(now)), 1, 'the slot the car left in stays counted');
+  for (const bucket of lockBuckets(start, start + 2 * HOUR).filter((x) => x > now)) {
+    assert.equal(cars(await occAt(bucket)), 0, `slot ${bucket} given back`);
+  }
+  const locks = await adminList('slot_locks');
+  assert.deepEqual(locks.map((l) => l.bucket), [now]);
+  // Someone else can now book the freed time on that bay.
+  await assertSucceeds(createBooking(db('bob'), 'bob', { start: (now + 1) * 30 * 60_000, hours: 1 }));
+});
+
+test('OP-06 the driver cannot check out, mark themselves arrived, or waive charges', async () => {
+  await makeOperator('op');
+  const b = await createBooking(db('alice'), 'alice', { start: nowStart(), hours: 2 });
+  await assertFails(updateDoc(doc(db('alice'), 'bookings', b.id), { bookingStatus: 'ACTIVE' }));
+  await checkIn(db('op'), b.id);
+  await assertFails(checkOut(db('alice'), b.id, 0));
+  await assertFails(updateDoc(doc(db('alice'), 'bookings', b.id), { extraCharges: 0 }));
+  await assertSucceeds(checkOut(db('op'), b.id, 59));
+  assert.equal((await adminRead(`bookings/${b.id}`)).extraCharges, 59);
+});
+
+test('OP-07 the operator cannot free a bay of a booking that is still running', async () => {
+  await makeOperator('op');
+  const b = await createBooking(db('alice'), 'alice');
+  const id = lockId(PARKING, b.spotNumber, bucketOf(b.entryTime.toMillis()));
+  await assertFails(deleteDoc(doc(db('op'), 'slot_locks', id)));
+});
+
+test('OP-08 blocking a bay for a walk-in car holds it; freeing it gives it back', async () => {
+  await makeOperator('op');
+  // A block is a booking the operator owns, starting now (the app writes it already ACTIVE).
+  const block = await assertSucceeds(createBooking(db('op'), 'op', { start: Date.now(), hours: 2 }));
+  await assert.rejects(createBooking(db('alice'), 'alice', { start: futureStart(1), hours: 1 }), /just booked/);
+  await checkIn(db('op'), block.id);
+  await assertSucceeds(checkOut(db('op'), block.id, 0));
+  await assertSucceeds(createBooking(db('alice'), 'alice', { start: futureStart(1), hours: 1 }));
+});
+
+test('OP-09 checking out early from a full-day stay (47 slots to give back) fits the rules limits', async () => {
+  await makeOperator('op');
+  const b = await createBooking(db('alice'), 'alice', { start: nowStart(), hours: 24 });
+  await checkIn(db('op'), b.id);
+  await assertSucceeds(checkOut(db('op'), b.id, 0));
+  assert.equal((await adminList('slot_locks')).length, 1);
 });

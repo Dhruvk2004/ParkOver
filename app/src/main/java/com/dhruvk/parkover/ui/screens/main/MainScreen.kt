@@ -93,7 +93,8 @@ fun MainScreen(
     vehicleViewModel: VehicleViewModel,
     homeViewModel: HomeViewModel,
     navController: NavHostController,
-    initialTab: Tab = Tab.Home
+    initialTab: Tab = Tab.Home,
+    onOperatorMode: (() -> Unit)? = null
 ) {
     val tabNavController = rememberNavController()
     val currentRoute = tabNavController.currentBackStackEntryAsState().value?.destination?.route
@@ -162,7 +163,8 @@ fun MainScreen(
                     onPaymentMethods = { navController.navigate(Screen.PaymentMethods.route) },
                     onHelpSupport = { navController.navigate(Screen.HelpSupport.route) },
                     onBookings = { selectTab(Tab.Bookings) },
-                    onSaved = { selectTab(Tab.Saved) }
+                    onSaved = { selectTab(Tab.Saved) },
+                    onOperatorMode = onOperatorMode
                 )
             }
         }

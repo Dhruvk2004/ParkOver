@@ -138,3 +138,40 @@ export async function extendBooking(fs, uid, booking, hours, capacity) {
     return updated;
   }));
 }
+
+// ---- Operator steps (OperatorRepository.kt: checkIn / checkOut) ----
+
+export async function checkIn(fs, bookingId) {
+  await retryIfRefused(() => runTransaction(fs, async (tx) => {
+    const ref = doc(fs, 'bookings', bookingId);
+    const fresh = await tx.get(ref);
+    if (!fresh.exists()) throw new Error('Booking not found.');
+    if (!['PENDING', 'CONFIRMED'].includes(fresh.get('bookingStatus'))) throw new Error('Not waiting.');
+    const now = Timestamp.now();
+    tx.update(ref, { bookingStatus: 'ACTIVE', checkedInAt: now, updatedAt: now });
+  }));
+}
+
+/** Arrived → Exited; frees the slots after the current one. Returns the extra charged. */
+export async function checkOut(fs, bookingId, extra = 0) {
+  return retryIfRefused(() => runTransaction(fs, async (tx) => {
+    const ref = doc(fs, 'bookings', bookingId);
+    const fresh = await tx.get(ref);
+    if (!fresh.exists() || fresh.get('bookingStatus') !== 'ACTIVE') throw new Error('Only a parked car can be checked out.');
+    const cur = fresh.data();
+    const nowMs = Date.now();
+    const release = lockBuckets(cur.entryTime.toMillis(), cur.exitTime.toMillis()).filter((b) => b > bucketOf(nowMs));
+    const lockSnaps = [], occSnaps = [];
+    for (const b of release) lockSnaps.push(await tx.get(doc(fs, 'slot_locks', lockId(cur.parkingId, cur.spotNumber, b))));
+    for (const b of release) occSnaps.push(await tx.get(doc(fs, 'occupancy', occupancyId(cur.parkingId, b))));
+    const now = Timestamp.fromMillis(nowMs);
+    tx.update(ref, { bookingStatus: 'COMPLETED', actualExitTime: now, extraCharges: extra, updatedAt: now });
+    lockSnaps.filter((s) => s.exists() && s.get('bookingId') === cur.id).forEach((s) => tx.delete(s.ref));
+    const floorKey = String(cur.floorNumber);
+    release.forEach((b, i) => {
+      if (count(occSnaps[i], cur.vehicleType) > 0 && floorCount(occSnaps[i], floorKey) > 0)
+        writeOccupancy(tx, occSnaps[i].ref, occSnaps[i], { parkingId: cur.parkingId, bucket: b, type: cur.vehicleType, floorKey, delta: -1, bookingId: cur.id });
+    });
+    return extra;
+  }));
+}
